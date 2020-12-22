@@ -1,10 +1,21 @@
 
 #include <iostream>
+#include <string>
+#include <sstream>
 #include <boost/asio.hpp>
 using namespace boost::asio;
+using namespace boost::system;
 using ec = const boost::system::error_code &;
+
+// Server - Arduino Hub Communication
+boost::asio::io_context io_arduino;
+boost::asio::serial_port sp{io_arduino};
+boost::system::error_code ec_arduino;
+boost::asio::streambuf read_buf; //read buffer
+
 class session
 {
+    // Server-Client Communication
     ip::tcp::socket sock;
     char buf[1];
     char command[10]; // Command read from client
@@ -108,6 +119,17 @@ public:
     }
     session(io_context &io) : sock(io) {}
     ip::tcp::socket &socket() { return sock; }
+
+    static void write_handler(const error_code &ec_, size_t nbytes) // Called after writing a command
+    {                                                               // waits for arduino response
+                                                                    // [ADICIONAR] timeout se demorar a responder
+        std::cout << "in async handler" << std::endl;
+        // async_read_until(sp, read_buf, '\n', [this](ec, std::size_t sz) {
+        //     std::cout << "FROM ARDUINO: " << &read_buf << std::endl; // Called after writing a command; waits for arduino response
+        //      enviar para cliente (formatar o trabalho)!!
+        // });  [ADICIONAR] timeout se demorar a responder
+    }
+
     void serve_client_request()
     {
 
@@ -120,12 +142,15 @@ public:
 
                                      //async_write(sock, buffer("antes da ecursividade"), [this](ec, std::size_t sz) {});
                                      command[cmd_cntr++] = buf[0]; // update command with current byet
-                                     async_write(sock, buffer("Hello World\n"), [this](ec, std::size_t sz) {});
-                                     std::cout << buf[0] << std::endl;
+
+                                     //std::cout << buf[0] << std::endl; // debug
                                      if (buf[0] == '\n')
                                      { //  End of command '\n'
-                                         check_valid_command();
+                                         std::cout << "FROM CLIENT: " << command << std::endl;
+                                         //check_valid_command();
+                                         async_write(sp, buffer(command), write_handler); //Writes to Arduino HUB (Serial Port)
 
+                                         //async_write(sock, buffer(command), [this](ec, std::size_t sz) {}); //Writes to client (TCP Socket)
                                          memset(command, 0, 10); // CLear buffer
                                          cmd_cntr = 0;           // Sets counter to zero after command read
                                      }
@@ -150,6 +175,7 @@ class server
                          [this, sess](ec err) {
                              if (!err)
                                  sess->serve_client_request();
+
                              else
                                  delete sess;
                              start_accept();
