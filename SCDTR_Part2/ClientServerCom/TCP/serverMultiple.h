@@ -3,25 +3,29 @@
 #include <string>
 #include <sstream>
 #include <boost/asio.hpp>
+#include <thread>
 using namespace boost::asio;
 using namespace boost::system;
 using ec = const boost::system::error_code &;
 
 // Server - Arduino Hub Communication
-boost::asio::io_context io_arduino;
-boost::asio::serial_port sp{io_arduino};
-boost::system::error_code ec_arduino;
-boost::asio::streambuf read_buf; //read buffer
+io_context io;
+serial_port sp{io};
+streambuf read_buf; //read buffer
 
 class session
 {
     // Server-Client Communication
-    ip::tcp::socket sock;
+    ip::tcp::socket sock{io};
     char buf[1];
-    char command[10]; // Command read from client
+    char command[16];     // Command read from client
+    char command_cpy[16]; // aux variable to save command
     int cmd_cntr = 0;
 
 public:
+    session() {}
+    ip::tcp::socket &socket() { return sock; }
+
     void check_valid_command()
     {
         if (command[0] == 'g')
@@ -117,17 +121,11 @@ public:
         {
         }
     }
-    session(io_context &io) : sock(io) {}
-    ip::tcp::socket &socket() { return sock; }
 
-    static void write_handler(const error_code &ec_, size_t nbytes) // Called after writing a command
-    {                                                               // waits for arduino response
-                                                                    // [ADICIONAR] timeout se demorar a responder
-        std::cout << "in async handler" << std::endl;
-        // async_read_until(sp, read_buf, '\n', [this](ec, std::size_t sz) {
-        //     std::cout << "FROM ARDUINO: " << &read_buf << std::endl; // Called after writing a command; waits for arduino response
-        //      enviar para cliente (formatar o trabalho)!!
-        // });  [ADICIONAR] timeout se demorar a responder
+    static void write_handler(ec &ec_, size_t nbytes) // Called after writing a command
+    {                                                 // waits for arduino response
+                                                      // [ADICIONAR] timeout se demorar a responder
+        std::cout << "Command successfully sent to Arduino" << std::endl;
     }
 
     void serve_client_request()
@@ -135,22 +133,33 @@ public:
 
         sock.async_read_some(buffer(buf, 1),
                              [this](ec err, size_t sz) {
-                                 std::cout << "Received \"" << buf[0] << "\" from: ";
-                                 std::cout << sock.remote_endpoint() << std::endl;
                                  if (buf[0] != 'q' && !err)
                                  {
 
-                                     //async_write(sock, buffer("antes da ecursividade"), [this](ec, std::size_t sz) {});
-                                     command[cmd_cntr++] = buf[0]; // update command with current byet
+                                     command[cmd_cntr++] = buf[0]; // update command with current byte
 
                                      //std::cout << buf[0] << std::endl; // debug
                                      if (buf[0] == '\n')
                                      { //  End of command '\n'
                                          std::cout << "FROM CLIENT: " << command << std::endl;
+                                         std::cout << "EOM: " << std::endl;
+                                         std::cout << "Depois de ler o comando, in avail:" << read_buf.in_avail() << std::endl;
                                          //check_valid_command();
-                                         async_write(sp, buffer(command), write_handler); //Writes to Arduino HUB (Serial Port)
+                                         memcpy(command_cpy, command, 10);
+                                         async_write(sp, buffer(command_cpy), write_handler); //Writes to Arduino HUB (Serial Port)
+                                         std::cout << "Depois de ler escrever p arduino, in avail:" << read_buf.in_avail() << std::endl;
 
-                                         //async_write(sock, buffer(command), [this](ec, std::size_t sz) {}); //Writes to client (TCP Socket)
+                                         async_read_until(sp, read_buf, '\n', [this](ec err, size_t sz) { // Reads from Arduino HUB (Serial Port)
+                                             std::cout << "Depois de ler do arduino, in avail:" << read_buf.in_avail() << std::endl;
+
+                                             //std::cout << "FROM ARDUINO: " << &read_buf << std::endl;
+
+                                             async_write(sock, read_buf, [this](ec, std::size_t sz) { //Writes to Client (TCP socket)
+                                                 std::cout << read_buf.in_avail() << std::endl;       //read_buf.consume(read_buf.size());                   // Clears buffer
+                                                 std::cout << "Return successfully sent to Client" << std::endl;
+                                             });
+                                         }); // Reads until '/n' = one command
+
                                          memset(command, 0, 10); // CLear buffer
                                          cmd_cntr = 0;           // Sets counter to zero after command read
                                      }
@@ -166,16 +175,14 @@ public:
 
 class server
 {
-    io_context &ctx;
     ip::tcp::acceptor acc;
     void start_accept()
     {
-        session *sess = new session{ctx};
+        session *sess = new session{};
         acc.async_accept(sess->socket(),
                          [this, sess](ec err) {
                              if (!err)
                                  sess->serve_client_request();
-
                              else
                                  delete sess;
                              start_accept();
@@ -183,8 +190,7 @@ class server
         );                 //end async_accept cal
     }                      //end start_accept();
 public:
-    server(io_service &io, unsigned short port) : ctx{io},
-                                                  acc{io, ip::tcp::endpoint{ip::tcp::v4(), port}}
+    server(io_service &io, unsigned short port) : acc{io, ip::tcp::endpoint{ip::tcp::v4(), port}}
     {
         std::cout << "Receiving at: " << acc.local_endpoint() << std::endl;
         start_accept();
