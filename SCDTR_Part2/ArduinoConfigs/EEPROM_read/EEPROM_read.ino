@@ -12,11 +12,12 @@
 // TAU MODELATION
 #define TAU_A_ADDR 17// Float
 #define TAU_B_ADDR 21// Float
+#define TAU0_ADDR 25// Float
 // PI CONTROLLER
-#define KP_ADDR 25
-#define KI_ADDR 29
+#define KP_ADDR 29
+#define KI_ADDR 33
 
-#define CHECKSUM_ADDR 33 //Float 
+#define CHECKSUM_ADDR 37 //Float 
 
 
 // ARDUINO/LDR VARIABLES
@@ -27,6 +28,7 @@ float R2_BASE;// Float
 float R2_EXP;// Float
 float TAU_A;// Float
 float TAU_B;// Float
+float TAU0;// Float
 float KP;
 float KI;
 float CHECKSUM; //Float 
@@ -41,11 +43,12 @@ void setup() {
   EEPROM.get(R2_EXP_ADDR, R2_EXP);
   EEPROM.get(TAU_A_ADDR, TAU_A);
   EEPROM.get(TAU_B_ADDR, TAU_B);
+  EEPROM.get(TAU0_ADDR, TAU0);
   EEPROM.get(KP_ADDR, KP);
   EEPROM.get(KI_ADDR, KI);
   EEPROM.get(CHECKSUM_ADDR, CHECKSUM);
   
-  cmp_checksum = (float)ID + M + B + R2_BASE + R2_EXP + TAU_A + TAU_B + KP + KI;
+  cmp_checksum = (float)ID + M + B + R2_BASE + R2_EXP + TAU_A + TAU_B + TAU0 + KP + KI;
   if (cmp_checksum != CHECKSUM){
     Serial.print("DATA IS CORRUPTED!");
     }

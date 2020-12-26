@@ -13,15 +13,16 @@
 // TAU MODELATION
 #define TAU_A_ADDR 17// Float
 #define TAU_B_ADDR 21// Float
+#define TAU0_ADDR 25// Float
 // PI CONTROLLER
-#define KP_ADDR 25
-#define KI_ADDR 29
+#define KP_ADDR 29
+#define KI_ADDR 33
 
-#define CHECKSUM_ADDR 33 //Float 
+#define CHECKSUM_ADDR 37 //Float 
 
 // --- VARIABLE DECLARATION ---
 // ARDUINO/LDR VARIABLES
-byte ID = 0; //byte
+byte ID = 255; //byte
 // LDR VARS
 float M = 1.2;   // Float
 float B = 500.123;// Float
@@ -31,6 +32,7 @@ float R2_EXP = 13.0001;// Float
 // TAU MODELATION
 float TAU_A = 170.0;// Float
 float TAU_B = 2100.12;// Float
+float TAU0 = 2;
 // PI CONTROLLER
 float KP = 0.1;
 float KI = 10;
@@ -53,10 +55,12 @@ void setup() {
   EEPROM.put(R2_EXP_ADDR, R2_EXP);
   EEPROM.put(TAU_A_ADDR, TAU_A);
   EEPROM.put(TAU_B_ADDR, TAU_B);
+  EEPROM.put(TAU0_ADDR, TAU0);
   EEPROM.put(KP_ADDR, KP);
   EEPROM.put(KI_ADDR, KI);
+  
 
-  CHECKSUM = (float)ID + M + B + R2_BASE + R2_EXP + TAU_A + TAU_B + KP + KI;
+  CHECKSUM = (float)ID + M + B + R2_BASE + R2_EXP + TAU_A + TAU_B + TAU0 + KP + KI;
   EEPROM.put(CHECKSUM_ADDR, CHECKSUM);
   
 Serial.begin(9600);
