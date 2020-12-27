@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <canFrameStream.h>
+#include "canFrameStream.h"
 #include <EEPROM.h>
 
 #include "EEPROM_data.h"
@@ -14,11 +14,7 @@ volatile bool initializing_network = true;
 volatile bool new_node = false; // When identified a new node in the ISR routine
 volatile uint8_t n_nodes = 1;   // Number of network nodes
 bool EONI_flag = false;
-bool HUB_MODE = false; // Indicates if this arduino is in HUB mode (responsible for realying msgs from Server to arduinos network)
-char serverMessage_char[16];
-
 uint8_t *node_list = (uint8_t *)malloc(sizeof(uint8_t));
-String serverMessage;
 
 can_frame_stream cf_stream;
 
@@ -70,13 +66,16 @@ union my_can_msg
   unsigned char bytes[8];
 };
 
-MCP2515::ERROR write(uint32_t id, char *val, uint8_t n)
+MCP2515::ERROR write(uint32_t id, uint32_t val)
 {
   can_frame frame;
   frame.can_id = id;
-  frame.can_dlc = n;
-  for (int i = 0; i < n; i++) //prepare can message
-    frame.data[i] = val[i];
+  frame.can_dlc = 4;
+  my_can_msg msg;
+  msg.value = val;            //pack data
+  for (int i = 0; i < 4; i++) //prepare can message
+    frame.data[i] = msg.bytes[i];
+  //send data
   return mcp2515.sendMessage(&frame);
 }
 MCP2515::ERROR write_byte(uint32_t id, uint8_t val)
@@ -205,14 +204,14 @@ void loop()
   //     Serial.println("\t\t\t\tMCP2515 TX Buf Full");
   // }
 
-  // if (millis() - ts >= 3500)
-  // {
-  //   my_can_msg msg_c;
-  //   msg_c.bytes[0] = node_list[1];
-  //   msg_c.bytes[1] = ++msg;
-  //   write(ID, msg_c.value);
-  //   ts = millis();
-  // }
+  if (millis() - ts >= 3500)
+  {
+    my_can_msg msg_c;
+    msg_c.bytes[0] = node_list[1];
+    msg_c.bytes[1] = ++msg;
+    write(ID, msg_c.value);
+    ts = millis();
+  }
 
   if (interrupt)
   {
@@ -235,12 +234,8 @@ void loop()
     my_can_msg msg;
     while (has_data)
     {
-      if (frame.data[IDm] == ID) // Message for this node
-      {
-        if (HUB_MODE && frame.data[SVm] == 1) // Define posisition 2 has server flag
-        {
-          Serial.print(frame.data); // Message to client
-        }
+      if (frame.data[0] == ID)
+      { // Message for this node
 
         for (int i = 0; i < frame.can_dlc; i++)
           msg.bytes[i] = frame.data[i];
@@ -256,23 +251,6 @@ void loop()
       cli();
       has_data = cf_stream.get(frame);
       sei();
-    }
-  }
-
-  if (Serial.available())
-  {
-
-    serverMessage = Serial.readString();
-
-    if (serverMessage[IDm] == ID)
-    {
-      // Processa a mensagem e retorna para o Server
-    }
-    else
-    {
-      serverMessage.toCharArray(serverMessage_char, serverMessage.length(), 0);
-      write(ID, serverMessage_char, serverMessage.length());
-      HUB_MODE = true;
     }
   }
   delay(500); //some time to breath
