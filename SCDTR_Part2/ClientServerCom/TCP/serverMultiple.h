@@ -22,8 +22,10 @@ class session
     char command_cpy[16]; // aux variable to save command
     int cmd_cntr = 0;
 
+    boost::asio::const_buffer buf_cpy;
+
 public:
-    session() {}
+    session(io_context &io) : sock(io) {}
     ip::tcp::socket &socket() { return sock; }
 
     void check_valid_command()
@@ -125,11 +127,41 @@ public:
     static void write_handler(ec &ec_, size_t nbytes) // Called after writing a command
     {                                                 // waits for arduino response
                                                       // [ADICIONAR] timeout se demorar a responder
-        std::cout << "Command successfully sent to Arduino" << std::endl;
+        std::cout << "WA Command successfully sent to Arduino" << std::endl;
+    }
+
+    void read_until_handler(ec err, size_t sz)
+    {
+        if (read_buf.in_avail() > 0) // If there's bytes to send in buffer
+        {
+            std::cout << "RU Depois de ler do arduino, in avail:" << read_buf.in_avail() << std::endl;
+
+            //
+            //buf_cpy = read_buf.data();
+            sock.wait(boost::asio::ip::tcp::socket::wait_write);
+            async_write(sock, read_buf, [this](ec err, std::size_t sz) {                            //Writes to Client (TCP socket)
+                std::cout << "RU Depois de escrever p cliente" << read_buf.in_avail() << std::endl; //read_buf.consume(read_buf.size());                   // Clears buffer
+                std::cout << "RU Return successfully sent to Client" << std::endl;
+                read_buf.consume(read_buf.in_avail());
+                //std::cout << "CONSUME" << &read_buf << std::endl;
+
+                if (err)
+                {
+                    std::cout << err << std::endl;
+                    exit(0);
+                    std::cout << "SZ == 0" << std::endl;
+                }
+            });
+        }
+        async_read_until(sp, read_buf, '\n', [this](ec err, size_t sz) {
+            read_until_handler(err, sz); // Reads from Arduino HUB (Serial Port)
+        });
     }
 
     void serve_client_request()
     {
+
+        // Reads until '/n' = one command
 
         sock.async_read_some(buffer(buf, 1),
                              [this](ec err, size_t sz) {
@@ -143,22 +175,11 @@ public:
                                      { //  End of command '\n'
                                          std::cout << "FROM CLIENT: " << command << std::endl;
                                          std::cout << "EOM: " << std::endl;
-                                         std::cout << "Depois de ler o comando, in avail:" << read_buf.in_avail() << std::endl;
+                                         std::cout << "AR Depois de ler o comando, in avail:" << read_buf.in_avail() << std::endl;
                                          //check_valid_command();
                                          memcpy(command_cpy, command, 10);
                                          async_write(sp, buffer(command_cpy), write_handler); //Writes to Arduino HUB (Serial Port)
-                                         std::cout << "Depois de ler escrever p arduino, in avail:" << read_buf.in_avail() << std::endl;
-
-                                         async_read_until(sp, read_buf, '\n', [this](ec err, size_t sz) { // Reads from Arduino HUB (Serial Port)
-                                             std::cout << "Depois de ler do arduino, in avail:" << read_buf.in_avail() << std::endl;
-
-                                             //std::cout << "FROM ARDUINO: " << &read_buf << std::endl;
-
-                                             async_write(sock, read_buf, [this](ec, std::size_t sz) { //Writes to Client (TCP socket)
-                                                 std::cout << read_buf.in_avail() << std::endl;       //read_buf.consume(read_buf.size());                   // Clears buffer
-                                                 std::cout << "Return successfully sent to Client" << std::endl;
-                                             });
-                                         }); // Reads until '/n' = one command
+                                         std::cout << "AR Depois de escrever p arduino, in avail:" << read_buf.in_avail() << std::endl;
 
                                          memset(command, 0, 10); // CLear buffer
                                          cmd_cntr = 0;           // Sets counter to zero after command read
@@ -171,18 +192,31 @@ public:
                              } //end async_read lambda arg
         );                     //end async_read call
     }                          //end start()
+    void serve_arduino_read()
+    {
+        std::cout << read_buf.size() << std::endl;
+        std::cout << read_buf.max_size() << std::endl;
+        std::cout << "New session..." << std::endl;
+        async_read_until(sp, read_buf, '\n', [this](ec err, size_t sz) {
+            read_until_handler(err, sz);
+        }); // Reads from Arduino HUB (Serial Port)
+    }
 };
 
 class server
 {
+    io_context &ctx;
     ip::tcp::acceptor acc;
     void start_accept()
     {
-        session *sess = new session{};
+        session *sess = new session{ctx};
         acc.async_accept(sess->socket(),
                          [this, sess](ec err) {
                              if (!err)
+                             {
                                  sess->serve_client_request();
+                                 sess->serve_arduino_read();
+                             }
                              else
                                  delete sess;
                              start_accept();
@@ -190,7 +224,8 @@ class server
         );                 //end async_accept cal
     }                      //end start_accept();
 public:
-    server(io_service &io, unsigned short port) : acc{io, ip::tcp::endpoint{ip::tcp::v4(), port}}
+    server(io_service &io, unsigned short port) : ctx{io},
+                                                  acc{io, ip::tcp::endpoint{ip::tcp::v4(), port}}
     {
         std::cout << "Receiving at: " << acc.local_endpoint() << std::endl;
         start_accept();
