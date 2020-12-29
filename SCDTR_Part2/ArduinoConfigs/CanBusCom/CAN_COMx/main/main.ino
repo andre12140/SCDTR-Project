@@ -14,7 +14,12 @@ volatile bool initializing_network = true;
 volatile bool new_node = false; // When identified a new node in the ISR routine
 volatile uint8_t n_nodes = 1;   // Number of network nodes
 bool EONI_flag = false;
+bool HUB_MODE = false; // Indicates if this arduino is in HUB mode (responsible for realying msgs from Server to arduinos network)
+
+char arduinoMessage[8];
+
 uint8_t *node_list = (uint8_t *)malloc(sizeof(uint8_t));
+String serverMessage;
 
 can_frame_stream cf_stream;
 
@@ -44,17 +49,18 @@ void irqHandler()
     mcp2515.clearRXnOVRFlags();
   }
   mcp2515.clearInterrupts();
-  Serial.println("Msg Received");
+  //Serial.print("Msg Received from ");
+  //Serial.println(frm.can_id);
 
   if (initializing_network && frm.data[0] == NID)
   {
-    Serial.println("Received NID");
+    //Serial.println("Received NID");
     new_node = true;
     EONI_flag = true;
   }
   else
   {
-    Serial.println("INTERRUPt = TRUE");
+    //Serial.println("INTERRUPt = TRUE");
     interrupt = true; //notify loop()
   }
 
@@ -66,16 +72,13 @@ union my_can_msg
   unsigned char bytes[8];
 };
 
-MCP2515::ERROR write(uint32_t id, uint32_t val)
+MCP2515::ERROR write(uint32_t id, char *val, uint8_t n)
 {
   can_frame frame;
   frame.can_id = id;
-  frame.can_dlc = 4;
-  my_can_msg msg;
-  msg.value = val;            //pack data
-  for (int i = 0; i < 4; i++) //prepare can message
-    frame.data[i] = msg.bytes[i];
-  //send data
+  frame.can_dlc = n;
+  for (int i = 0; i < n; i++) //prepare can message
+    frame.data[i] = val[i];
   return mcp2515.sendMessage(&frame);
 }
 MCP2515::ERROR write_byte(uint32_t id, uint8_t val)
@@ -92,8 +95,8 @@ unsigned long t = 0; // aux DEBUG
 void network_init()
 {
   can_frame frame;
-  Serial.print(ID);
-  Serial.println("Intializing network...");
+  //Serial.print(ID);
+  //Serial.println("Intializing network...");
   unsigned long time_ref = millis(); // Initial time stamp
                                      // Flag to indentify End Of Network Identification cycle
   while ((millis() - time_ref < 20000))
@@ -104,22 +107,23 @@ void network_init()
       cli();
       cf_stream.get(frame);
       sei();
-      Serial.println(frame.data[0]);
+      //Serial.println(frame.data[0]);
       n_nodes++; // incrementes number of nodes
       realloc(node_list, n_nodes);
       node_list[n_nodes - 1] = frame.can_id; // Adds new node ID to list of nodes
-      Serial.print("Identified node ID: ");
-      Serial.println(frame.can_id);
+      //Serial.print("Identified node ID: ");
+      //Serial.println(frame.can_id);
       break;
     }
     if ((millis() - t) >= 1000)
     {
-      Serial.println((t++) / 1000);
+      //Serial.println((t++) / 1000);
       t = millis();
     }
   }
-  Serial.println("20s passed OR EONI Flag received!");
-  Serial.println(millis() - time_ref);
+  //Serial.print("D 20s\n");
+  //Serial.println("20s passed OR EONI Flag received!");
+  //Serial.println(millis() - time_ref);
 
   write_byte(ID, NID);               // Broadcasts own ID
   time_ref = millis();               // New time stamp
@@ -132,23 +136,23 @@ void network_init()
       cli();
       cf_stream.get(frame);
       sei();
-      Serial.println(frame.data[0]);
+      //Serial.println(frame.data[0]);
       n_nodes++; // incrementes number of nodes
       realloc(node_list, n_nodes);
       node_list[n_nodes - 1] = frame.can_id; // Adds new node ID to list of nodes
-      Serial.print("Identified node ID: ");
-      Serial.println(frame.can_id);
+      //Serial.print("Identified node ID: ");
+      //Serial.println(frame.can_id);
     }
   }
 
   initializing_network = false;
-  Serial.print(ID);
-  Serial.println("\tEnd of network initialization!");
+  //Serial.print(ID);
+  //Serial.println("\tEnd of network initialization!");
 }
 
 void setup()
 {
-  Serial.begin(500000);
+  Serial.begin(1000000);
 
   EEPROM.get(ID_ADDR, ID);
   EEPROM.get(M_ADDR, M);
@@ -165,14 +169,14 @@ void setup()
   float cmp_checksum = (float)ID + M + B + R2_BASE + R2_EXP + TAU_A + TAU_B + TAU0 + KP + KI;
   if (cmp_checksum != CHECKSUM)
   {
-    Serial.println("DATA IS CORRUPTED!");
+    //Serial.println("DATA IS CORRUPTED!");
     delay(10);
     exit(0);
   }
 
   else
   {
-    Serial.println("DATA IS UNCORRUPTED!");
+    //Serial.println("DATA IS UNCORRUPTED!");
   }
 
   node_list[0] = ID;
@@ -187,6 +191,7 @@ void setup()
   //mcp2515.setLoopbackMode(); //for local testing
 
   network_init(); // Listens CANbus for other arduinos until a timeout and defines the list of nodes
+  Serial.print("D ANI!\n");
 }
 
 unsigned long counter = 0;
@@ -194,6 +199,7 @@ uint8_t msg = 0;
 unsigned long ts = millis();
 void loop()
 {
+
   //send a few msgs in a burst
   // for (int i = 0; i < 4; i++)
   // {
@@ -206,11 +212,8 @@ void loop()
 
   if (millis() - ts >= 3500)
   {
-    my_can_msg msg_c;
-    msg_c.bytes[0] = node_list[1];
-    msg_c.bytes[1] = ++msg;
-    write(ID, msg_c.value);
     ts = millis();
+    Serial.print("C IA!\n");
   }
 
   if (interrupt)
@@ -234,18 +237,44 @@ void loop()
     my_can_msg msg;
     while (has_data)
     {
-      if (frame.data[0] == ID)
-      { // Message for this node
+      
+      if (frame.data[IDm] == ID && frame.can_id != ID)  // Message for this node
+      { 
+        Serial.println("D Message for this node");
+        if (HUB_MODE && (((frame.data[CMDm] >> 7) & 0x01) == 1)) // Checks SV bit (if =1 rplies to server)
+        {
+          Serial.print("D Relayed message from another arduino to server\n");
+          Serial.print("D ");
+          Serial.println((char *)frame.data); // Message to client
+          HUB_MODE = false;
+        }
+        else if (((frame.data[CMDm] >> 6) & 0x01) == 0) // Evaluates response bit (if=0 replies)
+        {
+          // Processar comando
+          //Enviar return
+          Serial.print("D Received message from arduino HUB. Replies to him...\n");
+          arduinoMessage[CMDm] = frame.data[CMDm] | 0x40; // Set response bit to one
+          arduinoMessage[IDm] = frame.can_id;
+          arduinoMessage[2] = 'R';
+          write(ID, arduinoMessage, 3);
+        }
+        else if (((frame.data[CMDm] >> 6) & 0x01) == 1) // response bit = 1 > return from this arduino request
+        {
+          Serial.print("D This arduino got a response from it's request\n");
+          //var = return(comando) // Saves local variable for internal use
+        }
+        else {
+          Serial.println("D Else");
+        }
+        // for (int i = 0; i < frame.can_dlc; i++)
+        //   msg.bytes[i] = frame.data[i];
+        // Serial.print("\t\t");
 
-        for (int i = 0; i < frame.can_dlc; i++)
-          msg.bytes[i] = frame.data[i];
-        Serial.print("\t\t");
-
-        Serial.print("Receiving: ");
-        Serial.print(frame.can_id);
-        Serial.print(" :");
-        for (int i = 0; i < frame.can_dlc; i++)
-          Serial.println(msg.bytes[i]);
+        // Serial.print("Receiving: ");
+        // Serial.print(frame.can_id);
+        // Serial.print(" :");
+        // for (int i = 0; i < frame.can_dlc; i++)
+        //   Serial.println(msg.bytes[i]);
       }
 
       cli();
@@ -253,5 +282,50 @@ void loop()
       sei();
     }
   }
-  delay(500); //some time to breath
+
+  if (Serial.available()) // Received message from server
+  {
+    Serial.print("D SA\n");
+    serverMessage = Serial.readString();
+
+    if (serverMessage[IDm] == ID) // If message received is for this arduino
+    {
+      Serial.print("D Hub arduino got the command and replies\n");
+      // Processa a mensagem e retorna para o Server
+    }
+    else // If message is for an arduino of the network
+    {
+      if (checkID(serverMessage[IDm]))
+      {
+        Serial.print("D HUB arduino relays message to network\n");
+
+        const char *serverMessage_char = serverMessage.c_str();
+        write(ID, (char *)serverMessage_char, serverMessage.length());
+        Serial.print("D server msg ");
+        Serial.println(serverMessage_char);
+        Serial.print("D server msg length: ");
+        Serial.println(serverMessage.length());
+        Serial.print("D msg HEX: ");
+        Serial.println(serverMessage_char[0], HEX);
+        HUB_MODE = true;
+      }    // ID of the message corresponds to ID of arduino in network
+      else // Given ID in message has no arduino
+      {
+
+        Serial.print("C Error! ID sent on message doesn't correespond to arduino ID in the network\n");
+      }
+    }
+  }
+}
+
+bool checkID(uint8_t id)
+{ // Checks if the given id is a member of the node network
+  for (int i = 0; i < n_nodes; i++)
+  {
+    if (node_list[i] == id)
+    { // id matches the list member
+      return true;
+    }
+  }
+  return false;
 }

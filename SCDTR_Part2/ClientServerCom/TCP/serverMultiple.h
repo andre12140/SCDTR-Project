@@ -8,6 +8,8 @@ using namespace boost::asio;
 using namespace boost::system;
 using ec = const boost::system::error_code &;
 
+#define MSG_SIZE 64
+
 // Server - Arduino Hub Communication
 io_context io;
 serial_port sp{io};
@@ -18,11 +20,14 @@ class session
     // Server-Client Communication
     ip::tcp::socket sock{io};
     char buf[1];
-    char command[16];     // Command read from client
-    char command_cpy[16]; // aux variable to save command
+    char command[MSG_SIZE];     // Command read from client
+    char command_cpy[MSG_SIZE]; // aux variable to save command
     int cmd_cntr = 0;
 
-    boost::asio::const_buffer buf_cpy;
+    size_t nBufferSize;
+    char buf_cpy[MSG_SIZE];
+    std::stringstream ssOut;
+    std::__cxx11::string received_msg;
 
 public:
     session(io_context &io) : sock(io) {}
@@ -127,31 +132,36 @@ public:
     static void write_handler(ec &ec_, size_t nbytes) // Called after writing a command
     {                                                 // waits for arduino response
                                                       // [ADICIONAR] timeout se demorar a responder
-        std::cout << "WA Command successfully sent to Arduino" << std::endl;
+        //std::cout << "WA Command successfully sent to Arduino" << std::endl;
     }
 
     void read_until_handler(ec err, size_t sz)
     {
         if (read_buf.in_avail() > 0) // If there's bytes to send in buffer
         {
-            std::cout << "RU Depois de ler do arduino, in avail:" << read_buf.in_avail() << std::endl;
+            //std::cout << "RU Depois de ler do arduino, in avail:" << read_buf.in_avail() << std::endl;
+            memset(buf_cpy, 0, MSG_SIZE);
+            read_buf.sgetn(buf_cpy, sz); // Copy from read_buf (received msg from arduino)
 
-            //
-            //buf_cpy = read_buf.data();
-            sock.wait(boost::asio::ip::tcp::socket::wait_write);
-            async_write(sock, read_buf, [this](ec err, std::size_t sz) {                            //Writes to Client (TCP socket)
-                std::cout << "RU Depois de escrever p cliente" << read_buf.in_avail() << std::endl; //read_buf.consume(read_buf.size());                   // Clears buffer
-                std::cout << "RU Return successfully sent to Client" << std::endl;
-                read_buf.consume(read_buf.in_avail());
-                //std::cout << "CONSUME" << &read_buf << std::endl;
+            if (buf_cpy[0] == 'C') // MESSAGE TO CLIENT
+            {
+                sock.wait(boost::asio::ip::tcp::socket::wait_write);
+                async_write(sock, buffer(buf_cpy), [this](ec err, std::size_t sz) { //Writes to Client (TCP socket)
+                    //std::cout << "RU Depois de escrever p cliente" << read_buf.in_avail() << std::endl; //read_buf.consume(read_buf.size());                   // Clears buffer
+                    //std::cout << "RU Return successfully sent to Client" << std::endl;
 
-                if (err)
-                {
-                    std::cout << err << std::endl;
-                    exit(0);
-                    std::cout << "SZ == 0" << std::endl;
-                }
-            });
+                    if (err)
+                    {
+                        std::cout << err << std::endl;
+                        exit(0);
+                        std::cout << "SZ == 0" << std::endl;
+                    }
+                });
+            }
+            else if (buf_cpy[0] == 'D') // Debug
+            {
+                std::cout << "[DEBUG FROM ARDUINO] " << buf_cpy;
+            }
         }
         async_read_until(sp, read_buf, '\n', [this](ec err, size_t sz) {
             read_until_handler(err, sz); // Reads from Arduino HUB (Serial Port)
@@ -173,16 +183,20 @@ public:
                                      //std::cout << buf[0] << std::endl; // debug
                                      if (buf[0] == '\n')
                                      { //  End of command '\n'
-                                         std::cout << "FROM CLIENT: " << command << std::endl;
-                                         std::cout << "EOM: " << std::endl;
-                                         std::cout << "AR Depois de ler o comando, in avail:" << read_buf.in_avail() << std::endl;
+                                         std::cout << "FROM CLIENT: " << command;
+                                         //std::cout << "AR Depois de ler o comando, in avail:" << read_buf.in_avail() << std::endl;
                                          //check_valid_command();
-                                         memcpy(command_cpy, command, 10);
-                                         async_write(sp, buffer(command_cpy), write_handler); //Writes to Arduino HUB (Serial Port)
-                                         std::cout << "AR Depois de escrever p arduino, in avail:" << read_buf.in_avail() << std::endl;
+                                         memcpy(command_cpy, command, cmd_cntr);
+                                         command_cpy[0] = (command_cpy[0] | 0x80) & 0xBF; // sets SV flag = 1 AND sets Reply Flag to zero
+                                         command_cpy[1] = 255;
 
-                                         memset(command, 0, 10); // CLear buffer
-                                         cmd_cntr = 0;           // Sets counter to zero after command read
+                                         char msg_8[8];
+                                         memcpy(msg_8, command_cpy, 8);
+                                         async_write(sp, buffer(msg_8), write_handler); //Writes to Arduino HUB (Serial Port)
+                                         //std::cout << "AR Depois de escrever p arduino, in avail:" << read_buf.in_avail() << std::endl;
+
+                                         memset(command, 0, MSG_SIZE); // CLear buffer
+                                         cmd_cntr = 0;                 // Sets counter to zero after command read
                                      }
 
                                      serve_client_request();
@@ -194,8 +208,6 @@ public:
     }                          //end start()
     void serve_arduino_read()
     {
-        std::cout << read_buf.size() << std::endl;
-        std::cout << read_buf.max_size() << std::endl;
         std::cout << "New session..." << std::endl;
         async_read_until(sp, read_buf, '\n', [this](ec err, size_t sz) {
             read_until_handler(err, sz);

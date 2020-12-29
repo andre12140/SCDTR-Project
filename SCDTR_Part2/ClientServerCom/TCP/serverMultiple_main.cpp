@@ -4,7 +4,7 @@ int main()
 {
     // Serial communication setup
     boost::system::error_code ec_arduino;
-    sp.open("/dev/ttyUSB0", ec_arduino); //connect to port
+    sp.open("/dev/ttyACM0", ec_arduino); //connect to port
     if (ec_arduino)
         std::cout << "Could not open serial port \n";
     sp.set_option(serial_port_base::baud_rate{1000000}, ec_arduino);

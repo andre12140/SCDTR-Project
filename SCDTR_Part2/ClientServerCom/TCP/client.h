@@ -32,7 +32,7 @@ public:
 
     void start_read_server()
     {
-        std::cout << "À escuta..." << std::endl;
+        std::cout << "Waiting user input..." << std::endl;
         async_read_until(sock, input_buffer, '\n',
                          [this](const boost::system::error_code &err, size_t sz) {
                              if (!err)
@@ -40,10 +40,9 @@ public:
                                  std::string line;
                                  std::istream is{&input_buffer};
                                  std::getline(is, line);
-                                 std::cout << "No error in reading " << std::endl;
                                  if (!line.empty())
                                  {
-                                     std::cout << "Received: " << line << "\n";
+                                     std::cout << "[RECEIVED FROM SERVER]" << line << "\n";
                                  }
                                  start_read_server();
                              }

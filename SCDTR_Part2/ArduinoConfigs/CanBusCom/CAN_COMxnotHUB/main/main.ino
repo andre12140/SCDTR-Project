@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <canFrameStream.h>
+#include "canFrameStream.h"
 #include <EEPROM.h>
 
 #include "EEPROM_data.h"
@@ -49,7 +49,8 @@ void irqHandler()
     mcp2515.clearRXnOVRFlags();
   }
   mcp2515.clearInterrupts();
-  Serial.println("Msg Received");
+  Serial.print("Msg Received from ");
+  Serial.println(frm.can_id);
 
   if (initializing_network && frm.data[0] == NID)
   {
@@ -150,7 +151,7 @@ void network_init()
 
 void setup()
 {
-  Serial.begin(500000);
+  Serial.begin(1000000);
 
   EEPROM.get(ID_ADDR, ID);
   EEPROM.get(M_ADDR, M);
@@ -206,15 +207,16 @@ void loop()
   //     Serial.println("\t\t\t\tMCP2515 TX Buf Full");
   // }
 
-  // if (millis() - ts >= 3500)
-  // {
+   if (millis() - ts >= 3500)
+   {
   //   my_can_msg msg_c;
   //   msg_c.bytes[0] = node_list[1];
   //   msg_c.bytes[1] = ++msg;
   //   write(ID, msg_c.value);
-  //   ts = millis();
-  // }
-
+  ts = millis();
+      Serial.println("C IM ALIVE!\n");
+   }
+  
   if (interrupt)
   {
     interrupt = false;
@@ -236,16 +238,17 @@ void loop()
     my_can_msg msg;
     while (has_data)
     {
-      if (frame.data[IDm] == ID) // Message for this node
-      {
-        if (HUB_MODE && frame.data[CMDm] >> 7 & 0x01 == 1) // Checks SV bit (if =1 rplies to server)
+      if (frame.data[IDm] == ID && frame.can_id != ID)  // Message for this node
+      { 
+        Serial.println("D Message for this node");
+        if (HUB_MODE && (((frame.data[CMDm] >> 7) & 0x01) == 1)) // Checks SV bit (if =1 rplies to server)
         {
           Serial.print("D Relayed message from another arduino to server\n");
           Serial.print("D ");
           Serial.println((char *)frame.data); // Message to client
           HUB_MODE = false;
         }
-        else if (frame.data[CMDm] >> 6 & 0x01 == 0) // Evaluates response bit (if=0 replies)
+        else if (((frame.data[CMDm] >> 6) & 0x01) == 0) // Evaluates response bit (if=0 replies)
         {
           // Processar comando
           //Enviar return
@@ -255,12 +258,14 @@ void loop()
           arduinoMessage[2] = 'R';
           write(ID, arduinoMessage, 3);
         }
-        else if (frame.data[CMDm] >> 6 & 0x01 == 1) // response bit = 1 > return from this arduino request
+        else if (((frame.data[CMDm] >> 6) & 0x01) == 1) // response bit = 1 > return from this arduino request
         {
           Serial.print("D This arduino got a response from it's request\n");
           //var = return(comando) // Saves local variable for internal use
         }
-
+        else {
+          Serial.println("D Else");
+        }
         // for (int i = 0; i < frame.can_dlc; i++)
         //   msg.bytes[i] = frame.data[i];
         // Serial.print("\t\t");
