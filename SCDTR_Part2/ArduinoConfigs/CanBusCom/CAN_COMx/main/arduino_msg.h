@@ -8,6 +8,8 @@
 // Message Protocol
 #define CMDm 0
 #define IDm 1
-#define SVm 2
+
+// Comand codes - 6 bits
+#define GL 1
 
 #endif

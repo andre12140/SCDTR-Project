@@ -4,6 +4,8 @@
 #include <sstream>
 #include <boost/asio.hpp>
 #include <thread>
+#include "message.h"
+
 using namespace boost::asio;
 using namespace boost::system;
 using ec = const boost::system::error_code &;
@@ -33,98 +35,166 @@ public:
     session(io_context &io) : sock(io) {}
     ip::tcp::socket &socket() { return sock; }
 
-    void check_valid_command()
+    void check_valid_cmd(char *cmd_cv, char *msg)
     {
-        if (command[0] == 'g')
+        if (cmd_cv[0] == 'g')
         {
-            if (command[2] == 'l')
+            if (cmd_cv[2] == 'l')
+
             { // Get current measured illuminance at desk <i>.
+                msg[0] = (GL | 0x80) & 0xBF;
+                char subs_string[10] = {0};
+                memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+
+                int x = atoi(subs_string);
+                memcpy(&msg[1], &x, 1);
             }
-            else if (command[2] == 'd')
+
+            else if (cmd_cv[2] == 'd')
+
             { // Get current duty cycle at luminaire i
             }
-            else if (command[2] == 'o')
+
+            else if (cmd_cv[2] == 'o')
+
             { // Get current occupancy state at desk <i>
             }
-            else if (command[2] == 'O')
+
+            else if (cmd_cv[2] == 'O')
+
             { // Get lower bound on illuminance for Occupied state at desk <i>
             }
-            else if (command[2] == 'U')
+
+            else if (cmd_cv[2] == 'U')
+
             { // Get lower bound on illuminance for Unoccupied state at desk <i>
             }
-            else if (command[2] == 'L')
+
+            else if (cmd_cv[2] == 'L')
+
             { // Get current illuminance lower bound at desk <i>
             }
-            else if (command[2] == 'x')
+
+            else if (cmd_cv[2] == 'x')
+
             { // Get current external illuminance at desk <i>
             }
-            else if (command[2] == 'r')
+
+            else if (cmd_cv[2] == 'r')
+
             { // Get current illuminance control reference at desk <i>
             }
-            else if (command[2] == 'c')
+
+            else if (cmd_cv[2] == 'c')
+
             { // Get current energy cost at desk <i>
             }
-            else if (command[2] == 'p')
+
+            else if (cmd_cv[2] == 'p')
+
             {
-                if (command[4] == 'T')
+
+                if (cmd_cv[4] == 'T')
+
                 { // Get instantaneous total power consumption in the system.
                 }
+
                 else
+
                 { // Get instantaneous power consumption at desk <i>
                 }
             }
-            else if (command[2] == 't')
+
+            else if (cmd_cv[2] == 't')
+
             { // Get elapsed time since last restart
             }
-            else if (command[2] == 'e')
+
+            else if (cmd_cv[2] == 'e')
+
             {
-                if (command[4] == 'T')
+
+                if (cmd_cv[4] == 'T')
+
                 { // Get total accumulated energy consumption since last system restart.
                 }
+
                 else
+
                 { // Get accumulated energy consumption at desk <i> since the last system restart.
                 }
             }
-            else if (command[2] == 'v')
+
+            else if (cmd_cv[2] == 'v')
+
             {
-                if (command[4] == 'T')
+
+                if (cmd_cv[4] == 'T')
+
                 { // Get total visibility error since last system restart.
-                    std::cout << "command gvt" << std::endl;
+
+                    std::cout << "cmd_cv gvt" << std::endl;
                 }
+
                 else
+
                 { // Get accumulated visibility error at desk <i> since the last system restart.
                 }
             }
-            else if (command[2] == 'f')
+
+            else if (cmd_cv[2] == 'f')
+
             {
-                if (command[4] == 'T')
+
+                if (cmd_cv[4] == 'T')
+
                 { // Get total flicker error since last system restart.
                 }
+
                 else
+
                 { // Get accumulated flicker error at desk <i> since the last system restart.
                 }
             }
         }
 
-        else if (command[0] == 'o') // Set current occupancy state at desk <i>
+        else if (cmd_cv[0] == 'o') // Set current occupancy state at desk <i>
+
         {
         }
-        else if (command[0] == 'O') //Set lower bound on illuminance for occupancy state at desk <i>
+
+        else if (cmd_cv[0] == 'O') //Set lower bound on illuminance for occupancy state at desk <i>
+
         {
         }
-        else if (command[0] == 'U') // Set lower bound on illuminance for Unccupied state at desk <i>
+
+        else if (cmd_cv[0] == 'U') // Set lower bound on illuminance for Unccupied state at desk <i>
+
         {
         }
-        else if (command[0] == 'c') // Set current energy cost at desk <i>
+
+        else if (cmd_cv[0] == 'c') // Set current energy cost at desk <i>
+
         {
         }
-        else if (command[0] == 'r') // Restart system
+
+        else if (cmd_cv[0] == 'r') // Restart system
+
         {
         }
-        else if (command[0] == 'b') // Get last minute buffer of variable <x> of desk <i>. <x> can be “l” or “d”.
+
+        else if (cmd_cv[0] == 'b') // Get last minute buffer of variable <x> of desk <i>. <x> can be “l” or “d”.
+
         {
         }
-        else if (command[0] == 's') //Start/Stop stream of realtime variable <x> of desk <i>. <x> can be “l” or “d”.
+
+        else if (cmd_cv[0] == 's') //Start/Stop stream of realtime variable <x> of desk <i>. <x> can be “l” or “d”.
+
+        {
+        }
+
+        else
+
         {
         }
     }
@@ -187,12 +257,10 @@ public:
                                          //std::cout << "AR Depois de ler o comando, in avail:" << read_buf.in_avail() << std::endl;
                                          //check_valid_command();
                                          memcpy(command_cpy, command, cmd_cntr);
-                                         command_cpy[0] = (command_cpy[0] | 0x80) & 0xBF; // sets SV flag = 1 AND sets Reply Flag to zero
-                                         command_cpy[1] = 255;
+                                         char msg[8] = {0};
+                                         check_valid_cmd(command_cpy, msg);
 
-                                         char msg_8[8];
-                                         memcpy(msg_8, command_cpy, 8);
-                                         async_write(sp, buffer(msg_8), write_handler); //Writes to Arduino HUB (Serial Port)
+                                         async_write(sp, buffer(msg), write_handler); //Writes to Arduino HUB (Serial Port)
                                          //std::cout << "AR Depois de escrever p arduino, in avail:" << read_buf.in_avail() << std::endl;
 
                                          memset(command, 0, MSG_SIZE); // CLear buffer

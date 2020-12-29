@@ -50,11 +50,13 @@ void setup() {
   
   cmp_checksum = (float)ID + M + B + R2_BASE + R2_EXP + TAU_A + TAU_B + TAU0 + KP + KI;
   if (cmp_checksum != CHECKSUM){
-    Serial.print("DATA IS CORRUPTED!");
+    Serial.println("DATA IS CORRUPTED!");
     }
 
   else{
     Serial.print("DATA IS UNCORRUPTED!");
+    Serial.print("My ID is ");
+    Serial.print(ID);
     }
     delay(100);
     exit(0);

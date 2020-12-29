@@ -165,7 +165,7 @@ void setup()
   EEPROM.get(KP_ADDR, KP);
   EEPROM.get(KI_ADDR, KI);
   EEPROM.get(CHECKSUM_ADDR, CHECKSUM);
-
+  
   float cmp_checksum = (float)ID + M + B + R2_BASE + R2_EXP + TAU_A + TAU_B + TAU0 + KP + KI;
   if (cmp_checksum != CHECKSUM)
   {
@@ -291,6 +291,11 @@ void loop()
     if (serverMessage[IDm] == ID) // If message received is for this arduino
     {
       Serial.print("D Hub arduino got the command and replies\n");
+      // Meter todos os casos possiveis numa função!
+      if ((serverMessage[CMDm] & 0x3F) == GL){
+
+        Serial.print("C return g l <val>\n");
+      }
       // Processa a mensagem e retorna para o Server
     }
     else // If message is for an arduino of the network
@@ -301,12 +306,6 @@ void loop()
 
         const char *serverMessage_char = serverMessage.c_str();
         write(ID, (char *)serverMessage_char, serverMessage.length());
-        Serial.print("D server msg ");
-        Serial.println(serverMessage_char);
-        Serial.print("D server msg length: ");
-        Serial.println(serverMessage.length());
-        Serial.print("D msg HEX: ");
-        Serial.println(serverMessage_char[0], HEX);
         HUB_MODE = true;
       }    // ID of the message corresponds to ID of arduino in network
       else // Given ID in message has no arduino
