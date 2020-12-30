@@ -15,8 +15,7 @@ volatile bool new_node = false; // When identified a new node in the ISR routine
 volatile uint8_t n_nodes = 1;   // Number of network nodes
 bool EONI_flag = false;
 bool HUB_MODE = false; // Indicates if this arduino is in HUB mode (responsible for realying msgs from Server to arduinos network)
-
-char arduinoMessage[8];
+String arduinoMessage;
 
 uint8_t *node_list = (uint8_t *)malloc(sizeof(uint8_t));
 String serverMessage;
@@ -95,8 +94,8 @@ unsigned long t = 0; // aux DEBUG
 void network_init()
 {
   can_frame frame;
-  //Serial.print(ID);
-  //Serial.println("Intializing network...");
+  Serial.print(ID);
+  Serial.println("Intializing network...");
   unsigned long time_ref = millis(); // Initial time stamp
                                      // Flag to indentify End Of Network Identification cycle
   while ((millis() - time_ref < 20000))
@@ -111,18 +110,18 @@ void network_init()
       n_nodes++; // incrementes number of nodes
       realloc(node_list, n_nodes);
       node_list[n_nodes - 1] = frame.can_id; // Adds new node ID to list of nodes
-      //Serial.print("Identified node ID: ");
-      //Serial.println(frame.can_id);
+      Serial.print("Identified node ID: ");
+      Serial.println(frame.can_id);
       break;
     }
     if ((millis() - t) >= 1000)
     {
-      //Serial.println((t++) / 1000);
+      Serial.println((t++) / 1000);
       t = millis();
     }
   }
   //Serial.print("D 20s\n");
-  //Serial.println("20s passed OR EONI Flag received!");
+  Serial.println("20s passed OR EONI Flag received!");
   //Serial.println(millis() - time_ref);
 
   write_byte(ID, NID);               // Broadcasts own ID
@@ -165,7 +164,7 @@ void setup()
   EEPROM.get(KP_ADDR, KP);
   EEPROM.get(KI_ADDR, KI);
   EEPROM.get(CHECKSUM_ADDR, CHECKSUM);
-  
+
   float cmp_checksum = (float)ID + M + B + R2_BASE + R2_EXP + TAU_A + TAU_B + TAU0 + KP + KI;
   if (cmp_checksum != CHECKSUM)
   {
@@ -192,6 +191,385 @@ void setup()
 
   network_init(); // Listens CANbus for other arduinos until a timeout and defines the list of nodes
   Serial.print("D ANI!\n");
+}
+
+String processes_cmd(String serverMessage)
+{
+  String return_msg;
+  if ((serverMessage[CMDm] & 0x3F) == gl)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    float aux;
+    memcpy(&aux, &serverMessage[2], sizeof(float));
+
+    return_msg = "l " + String(uint8_t(serverMessage[IDm])) + String(' ') + String(aux);
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == gd)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    float aux;
+    memcpy(&aux, &serverMessage[2], sizeof(float));
+    return_msg = "d " + String(uint8_t(serverMessage[IDm])) + String(' ') + String(aux);
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == go)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    return_msg = "o " + String(uint8_t(serverMessage[IDm])) + String(' ') + String(uint8_t(serverMessage[2]));
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == gO)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    float aux;
+    memcpy(&aux, &serverMessage[2], sizeof(float));
+    return_msg = "O " + String(uint8_t(serverMessage[IDm])) + String(' ') + String(aux);
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == gU)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    float aux;
+    memcpy(&aux, &serverMessage[2], sizeof(float));
+    return_msg = "U " + String(uint8_t(serverMessage[IDm])) + String(' ') + String(aux);
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == gL)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    float aux;
+    memcpy(&aux, &serverMessage[2], sizeof(float));
+    return_msg = "L " + String(uint8_t(serverMessage[IDm])) + String(' ') + String(aux);
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == gx)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    float aux;
+    memcpy(&aux, &serverMessage[2], sizeof(float));
+    return_msg = "x " + String(uint8_t(serverMessage[IDm])) + String(' ') + String(aux);
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == gr)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    float aux;
+    memcpy(&aux, &serverMessage[2], sizeof(float));
+    return_msg = "r " + String(uint8_t(serverMessage[IDm])) + String(' ') + String(aux);
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == gc)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    float aux;
+    memcpy(&aux, &serverMessage[2], sizeof(float));
+    return_msg = "c " + String(uint8_t(serverMessage[IDm])) + String(' ') + String(aux);
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == gp)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    float aux;
+    memcpy(&aux, &serverMessage[2], sizeof(float));
+    return_msg = "p " + String(uint8_t(serverMessage[IDm])) + String(' ') + String(aux);
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == gpT)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    float aux;
+    memcpy(&aux, &serverMessage[2], sizeof(float));
+    return_msg = "p T " + String(aux);
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == gt)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    float aux;
+    memcpy(&aux, &serverMessage[2], sizeof(float));
+    return_msg = "t " + String(uint8_t(serverMessage[IDm])) + String(' ') + String(aux);
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == ge)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    float aux;
+    memcpy(&aux, &serverMessage[2], sizeof(float));
+    return_msg = "e " + String(uint8_t(serverMessage[IDm])) + String(' ') + String(aux);
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == geT)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    float aux;
+    memcpy(&aux, &serverMessage[2], sizeof(float));
+    return_msg = "e T " + String(aux);
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == gv)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    float aux;
+    memcpy(&aux, &serverMessage[2], sizeof(float));
+    return_msg = "v " + String(uint8_t(serverMessage[IDm])) + String(' ') + String(aux);
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == gvT)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    float aux;
+    memcpy(&aux, &serverMessage[2], sizeof(float));
+    return_msg = "v T " + String(aux);
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == gf)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    float aux;
+    memcpy(&aux, &serverMessage[2], sizeof(float));
+    return_msg = "f " + String(uint8_t(serverMessage[IDm])) + String(' ') + String(aux);
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == gfT)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    float aux;
+    memcpy(&aux, &serverMessage[2], sizeof(float));
+    return_msg = "f T " + String(aux);
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == o)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    if (serverMessage[2] == 1)
+    {
+      return_msg = "ack";
+    }
+    else
+    {
+      return_msg = "err";
+    }
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == O)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    if (serverMessage[2] == 1)
+    {
+      return_msg = "ack";
+    }
+    else
+    {
+      return_msg = "err";
+    }
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == U)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    if (serverMessage[2] == 1)
+    {
+      return_msg = "ack";
+    }
+    else
+    {
+      return_msg = "err";
+    }
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == c)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    if (serverMessage[2] == 1)
+    {
+      return_msg = "ack";
+    }
+    else
+    {
+      return_msg = "err";
+    }
+    return return_msg;
+  }
+
+  else if ((serverMessage[CMDm] & 0x3F) == r)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    if (serverMessage[2] == 1)
+    {
+      return_msg = "ack";
+    }
+    else
+    {
+      return_msg = "err";
+    }
+    return return_msg;
+  }
+  else if ((serverMessage[CMDm] & 0x3F) == b)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    return_msg = "Get last minute buffer of variable [IMPLEMENTAR]";
+    return return_msg;
+  }
+  else if ((serverMessage[CMDm] & 0x3F) == ss)
+  { // // Get current duty cycle at luminaire i   (AND 0x3F to clear signal bits)
+    return_msg = "Start/stop  [IMPLEMENTAR]";
+    return return_msg;
+  }
+
+  else
+  {
+    return "ERROR";
+  }
+}
+
+uint8_t executes(char *cmd) // Executes the function associated with the requested command. Returns nomber of bytes of the return msg.
+{
+  if ((cmd[CMDm] & 0x3F) == gl)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    float a = 12.34;
+    memcpy(&cmd[2], &a, sizeof(float));
+    Serial.println("D estou no gl");
+    return 6; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == gd)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    float a = 23.45;
+    memcpy(&cmd[2], &a, sizeof(float));
+    return 6; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == go)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    bool a = true;
+    memcpy(&cmd[2], &a, sizeof(bool));
+    return 3; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == gO)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    float a = 52.34;
+    memcpy(&cmd[2], &a, sizeof(float));
+    return 6; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == gU)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    float a = 37.34;
+    memcpy(&cmd[2], &a, sizeof(float));
+    return 6; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == gL)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    float a = 12.92;
+    memcpy(&cmd[2], &a, sizeof(float));
+    return 6; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == gx)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    float a = 65.34;
+    memcpy(&cmd[2], &a, sizeof(float));
+    return 6; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == gr)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    float a = 61.34;
+    memcpy(&cmd[2], &a, sizeof(float));
+    return 6; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == gc)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    float a = 17.34;
+    memcpy(&cmd[2], &a, sizeof(float));
+    return 6; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == gp)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    float a = 1234.01;
+    memcpy(&cmd[2], &a, sizeof(float));
+    return 6; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == gpT)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+
+    // Get total val. Will request values from other arduinos and sum it
+    float a = 666.34;
+    memcpy(&cmd[2], &a, sizeof(float));
+    return 6; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == gt)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    float a = (float)millis();
+    memcpy(&cmd[2], &a, sizeof(float));
+    Serial.println("D estou no gt");
+    return 6; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == ge)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    float a = 123.34;
+    memcpy(&cmd[2], &a, sizeof(float));
+    return 6; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == geT)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    // Get total val. Will request values from other arduinos and sum it
+    float a = 666.34;
+    memcpy(&cmd[2], &a, sizeof(float));
+    return 6; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == gv)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    float a = 13.34;
+    memcpy(&cmd[2], &a, sizeof(float));
+    return 6; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == gvT)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    // Get total val. Will request values from other arduinos and sum it
+    float a = 666.0;
+    memcpy(&cmd[2], &a, sizeof(float));
+    return 6; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == gf)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    float a = 123.34;
+    memcpy(&cmd[2], &a, sizeof(float));
+    return 6; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == gfT)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    // Get total val. Will request values from other arduinos and sum it
+    float a = 666.666;
+    memcpy(&cmd[2], &a, sizeof(float));
+    return 6; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == r)
+  { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+    // Resets all nodes. Wait for ACK from all the network, then resets himself
+    bool a = true;
+    memcpy(&cmd[2], &a, sizeof(bool));
+    return 3; // returns number of bytes
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == b)
+  {
+  }
+
+  else if ((cmd[CMDm] & 0x3F) == ss)
+  {
+  }
 }
 
 unsigned long counter = 0;
@@ -237,33 +615,44 @@ void loop()
     my_can_msg msg;
     while (has_data)
     {
-      
-      if (frame.data[IDm] == ID && frame.can_id != ID)  // Message for this node
-      { 
+
+      if (frame.data[IDm] == ID && frame.can_id != ID) // Message for this node
+      {
         Serial.println("D Message for this node");
         if (HUB_MODE && (((frame.data[CMDm] >> 7) & 0x01) == 1)) // Checks SV bit (if =1 rplies to server)
         {
           Serial.print("D Relayed message from another arduino to server\n");
-          Serial.print("D ");
-          Serial.println((char *)frame.data); // Message to client
+
+          frame.data[IDm] = frame.can_id;
+          //memcpy(&(frame.data[IDm]), &(frame.can_id), 1);
+          Serial.print("C ");
+          Serial.println(processes_cmd((char *)(frame.data))); // Sends to Server formated return of the requested cmd
+
           HUB_MODE = false;
         }
         else if (((frame.data[CMDm] >> 6) & 0x01) == 0) // Evaluates response bit (if=0 replies)
         {
+          //char aux_msg[8];
           // Processar comando
           //Enviar return
+          char new_str[8];
           Serial.print("D Received message from arduino HUB. Replies to him...\n");
-          arduinoMessage[CMDm] = frame.data[CMDm] | 0x40; // Set response bit to one
-          arduinoMessage[IDm] = frame.can_id;
-          arduinoMessage[2] = 'R';
-          write(ID, arduinoMessage, 3);
+          new_str[CMDm] = (char)(frame.data[CMDm] | 0x40); // Set response bit to one
+          new_str[IDm] = (char)frame.can_id;
+          //Serial.println(aux_msg[CMDm], HEX);
+          //Serial.println(aux_msg[IDm], HEX);
+
+          uint8_t n = executes(new_str); // return number of bytes of arduinoMessage
+          Serial.println(new_str[2], HEX);
+          write(ID, new_str, n);
         }
         else if (((frame.data[CMDm] >> 6) & 0x01) == 1) // response bit = 1 > return from this arduino request
         {
           Serial.print("D This arduino got a response from it's request\n");
           //var = return(comando) // Saves local variable for internal use
         }
-        else {
+        else
+        {
           Serial.println("D Else");
         }
         // for (int i = 0; i < frame.can_dlc; i++)
@@ -288,15 +677,17 @@ void loop()
     Serial.print("D SA\n");
     serverMessage = Serial.readString();
 
-    if (serverMessage[IDm] == ID) // If message received is for this arduino
+    if (uint8_t(serverMessage[IDm]) == ID) // If message received is for this arduino
     {
       Serial.print("D Hub arduino got the command and replies\n");
       // Meter todos os casos possiveis numa função!
-      if ((serverMessage[CMDm] & 0x3F) == GL){
 
-        Serial.print("C return g l <val>\n");
-      }
+      executes((char *)(serverMessage.c_str()));
+      Serial.print("D serverMessage[2] ");
+      Serial.println(serverMessage[2]);
       // Processa a mensagem e retorna para o Server
+      Serial.print("C ");
+      Serial.println(processes_cmd(serverMessage));
     }
     else // If message is for an arduino of the network
     {

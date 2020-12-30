@@ -35,168 +35,280 @@ public:
     session(io_context &io) : sock(io) {}
     ip::tcp::socket &socket() { return sock; }
 
-    void check_valid_cmd(char *cmd_cv, char *msg)
+    bool check_valid_cmd(char *cmd_cv, char *msg)
     {
         if (cmd_cv[0] == 'g')
         {
             if (cmd_cv[2] == 'l')
-
             { // Get current measured illuminance at desk <i>.
-                msg[0] = (GL | 0x80) & 0xBF;
-                char subs_string[10] = {0};
+                msg[0] = (gl | 0x80) & 0xBF;
+                char subs_string[10] = {0}; // Conversion of string ID to int
                 memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
-
                 int x = atoi(subs_string);
                 memcpy(&msg[1], &x, 1);
             }
 
             else if (cmd_cv[2] == 'd')
-
             { // Get current duty cycle at luminaire i
+                msg[0] = (gd | 0x80) & 0xBF;
+                char subs_string[10] = {0}; // Conversion of string ID to int
+                memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+                int x = atoi(subs_string);
+                memcpy(&msg[1], &x, 1);
             }
 
             else if (cmd_cv[2] == 'o')
-
             { // Get current occupancy state at desk <i>
+                msg[0] = (go | 0x80) & 0xBF;
+                char subs_string[10] = {0}; // Conversion of string ID to int
+                memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+                int x = atoi(subs_string);
+                memcpy(&msg[1], &x, 1);
             }
 
             else if (cmd_cv[2] == 'O')
-
             { // Get lower bound on illuminance for Occupied state at desk <i>
+                msg[0] = (gO | 0x80) & 0xBF;
+                char subs_string[10] = {0}; // Conversion of string ID to int
+                memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+                int x = atoi(subs_string);
+                memcpy(&msg[1], &x, 1);
             }
 
             else if (cmd_cv[2] == 'U')
-
             { // Get lower bound on illuminance for Unoccupied state at desk <i>
+                msg[0] = (gU | 0x80) & 0xBF;
+                char subs_string[10] = {0}; // Conversion of string ID to int
+                memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+                int x = atoi(subs_string);
+                memcpy(&msg[1], &x, 1);
             }
 
             else if (cmd_cv[2] == 'L')
-
             { // Get current illuminance lower bound at desk <i>
+                msg[0] = (gL | 0x80) & 0xBF;
+                char subs_string[10] = {0}; // Conversion of string ID to int
+                memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+                int x = atoi(subs_string);
+                memcpy(&msg[1], &x, 1);
             }
 
             else if (cmd_cv[2] == 'x')
-
             { // Get current external illuminance at desk <i>
+                msg[0] = (gx | 0x80) & 0xBF;
+                char subs_string[10] = {0}; // Conversion of string ID to int
+                memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+                int x = atoi(subs_string);
+                memcpy(&msg[1], &x, 1);
             }
 
             else if (cmd_cv[2] == 'r')
-
             { // Get current illuminance control reference at desk <i>
+                msg[0] = (gr | 0x80) & 0xBF;
+                char subs_string[10] = {0}; // Conversion of string ID to int
+                memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+                int x = atoi(subs_string);
+                memcpy(&msg[1], &x, 1);
             }
 
             else if (cmd_cv[2] == 'c')
-
             { // Get current energy cost at desk <i>
+                msg[0] = (gc | 0x80) & 0xBF;
+                char subs_string[10] = {0}; // Conversion of string ID to int
+                memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+                int x = atoi(subs_string);
+                memcpy(&msg[1], &x, 1);
             }
 
             else if (cmd_cv[2] == 'p')
-
             {
-
                 if (cmd_cv[4] == 'T')
 
                 { // Get instantaneous total power consumption in the system.
+                    msg[0] = (gpT | 0x80) & 0xBF;
                 }
 
                 else
-
                 { // Get instantaneous power consumption at desk <i>
+                    msg[0] = (gp | 0x80) & 0xBF;
+                    char subs_string[10] = {0}; // Conversion of string ID to int
+                    memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+                    int x = atoi(subs_string);
+                    memcpy(&msg[1], &x, 1);
                 }
             }
 
             else if (cmd_cv[2] == 't')
 
             { // Get elapsed time since last restart
+                msg[0] = (gt | 0x80) & 0xBF;
+                char subs_string[10] = {0}; // Conversion of string ID to int
+                memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+                int x = atoi(subs_string);
+                memcpy(&msg[1], &x, 1);
             }
 
             else if (cmd_cv[2] == 'e')
-
             {
 
                 if (cmd_cv[4] == 'T')
-
                 { // Get total accumulated energy consumption since last system restart.
+                    msg[0] = (geT | 0x80) & 0xBF;
                 }
 
                 else
-
                 { // Get accumulated energy consumption at desk <i> since the last system restart.
+                    msg[0] = (ge | 0x80) & 0xBF;
+                    char subs_string[10] = {0}; // Conversion of string ID to int
+                    memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+                    int x = atoi(subs_string);
+                    memcpy(&msg[1], &x, 1);
                 }
             }
 
             else if (cmd_cv[2] == 'v')
-
             {
 
                 if (cmd_cv[4] == 'T')
 
                 { // Get total visibility error since last system restart.
-
-                    std::cout << "cmd_cv gvt" << std::endl;
+                    msg[0] = (gvT | 0x80) & 0xBF;
                 }
 
                 else
-
                 { // Get accumulated visibility error at desk <i> since the last system restart.
+                    msg[0] = (gv | 0x80) & 0xBF;
+                    char subs_string[10] = {0}; // Conversion of string ID to int
+                    memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+                    int x = atoi(subs_string);
+                    memcpy(&msg[1], &x, 1);
                 }
             }
 
             else if (cmd_cv[2] == 'f')
-
             {
-
                 if (cmd_cv[4] == 'T')
-
                 { // Get total flicker error since last system restart.
+                    msg[0] = (gfT | 0x80) & 0xBF;
                 }
 
                 else
-
                 { // Get accumulated flicker error at desk <i> since the last system restart.
+                    msg[0] = (gf | 0x80) & 0xBF;
+                    char subs_string[10] = {0}; // Conversion of string ID to int
+                    memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+                    int x = atoi(subs_string);
+                    memcpy(&msg[1], &x, 1);
                 }
             }
         }
 
         else if (cmd_cv[0] == 'o') // Set current occupancy state at desk <i>
-
         {
+            msg[0] = (o | 0x80) & 0xBF;
+            char subs_string[10] = {0}; // Conversion of string ID to int
+            memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+
+            char *tok;
+            tok = strtok(subs_string, " ");
+            int x = atoi(tok);
+            memcpy(&msg[1], &x, 1); // <i>
+            tok = strtok(subs_string, " ");
+            x = atoi(tok);
+            memcpy(&msg[2], &x, 1); // <val>
         }
 
         else if (cmd_cv[0] == 'O') //Set lower bound on illuminance for occupancy state at desk <i>
-
         {
+            msg[0] = (O | 0x80) & 0xBF;
+            char subs_string[10] = {0}; // Conversion of string ID to int
+            memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+
+            char *tok;
+            tok = strtok(subs_string, " ");
+            int x = atoi(tok);
+            memcpy(&msg[1], &x, 1); // <i>
+            tok = strtok(subs_string, " ");
+            float y = atof(tok);
+            memcpy(&msg[2], &y, sizeof(float)); // <val>
         }
 
         else if (cmd_cv[0] == 'U') // Set lower bound on illuminance for Unccupied state at desk <i>
-
         {
+            msg[0] = (U | 0x80) & 0xBF;
+            char subs_string[10] = {0}; // Conversion of string ID to int
+            memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+
+            char *tok;
+            tok = strtok(subs_string, " ");
+            int x = atoi(tok);
+            memcpy(&msg[1], &x, 1); // <i>
+            tok = strtok(subs_string, " ");
+            float y = atof(tok);
+            memcpy(&msg[2], &y, sizeof(float)); // <val>
         }
 
         else if (cmd_cv[0] == 'c') // Set current energy cost at desk <i>
-
         {
+            msg[0] = (c | 0x80) & 0xBF;
+            char subs_string[10] = {0}; // Conversion of string ID to int
+            memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+
+            char *tok;
+            tok = strtok(subs_string, " ");
+            int x = atoi(tok);
+            memcpy(&msg[1], &x, 1); // <i>
+            tok = strtok(subs_string, " ");
+            float y = atof(tok);
+            memcpy(&msg[2], &y, sizeof(float)); // <val>
         }
 
         else if (cmd_cv[0] == 'r') // Restart system
-
         {
+            msg[0] = (r | 0x80) & 0xBF;
         }
 
         else if (cmd_cv[0] == 'b') // Get last minute buffer of variable <x> of desk <i>. <x> can be “l” or “d”.
-
         {
+            msg[0] = (b | 0x80) & 0xBF;
+            char subs_string[10] = {0}; // Conversion of string ID to int
+            memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+
+            char *tok;
+            tok = strtok(subs_string, " ");
+            memcpy(&msg[1], &tok, 1); // "l" or "d"
+            if (msg[1] != 'l' || msg[1] != 'd')
+            {
+                return false;
+            }
+            tok = strtok(subs_string, " ");
+            int y = atoi(tok);
+            memcpy(&msg[2], &y, 1); // <i>
         }
 
         else if (cmd_cv[0] == 's') //Start/Stop stream of realtime variable <x> of desk <i>. <x> can be “l” or “d”.
-
         {
+            msg[0] = (ss | 0x80) & 0xBF;
+            char subs_string[10] = {0}; // Conversion of string ID to int
+            memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+
+            char *tok;
+            tok = strtok(subs_string, " ");
+            memcpy(&msg[1], &tok, 1); // "l" or "d"
+            if (msg[1] != 'l' || msg[1] != 'd')
+            {
+                return false;
+            }
+            tok = strtok(subs_string, " ");
+            int y = atoi(tok);
+            memcpy(&msg[2], &y, 1); // <i>
         }
 
         else
-
         {
+            return false;
         }
+        return true;
     }
 
     static void write_handler(ec &ec_, size_t nbytes) // Called after writing a command
