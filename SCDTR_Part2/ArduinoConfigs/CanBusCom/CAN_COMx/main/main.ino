@@ -2,7 +2,7 @@
 #include "canFrameStream.h"
 #include <EEPROM.h>
 
-#include "EEPROM_data.h"
+#include <EEPROM_data.h>
 #include "arduino_msg.h"
 
 MCP2515 mcp2515(10); //SS pin 10

@@ -1,5 +1,5 @@
 #include <SPI.h>
-#include <mcp2515.h>
+#include "mcp2515.h"
 
 class can_frame_stream
 {
