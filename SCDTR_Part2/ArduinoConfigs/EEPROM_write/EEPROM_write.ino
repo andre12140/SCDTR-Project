@@ -22,7 +22,7 @@
 
 // --- VARIABLE DECLARATION ---
 // ARDUINO/LDR VARIABLES
-byte ID = 1; //byte
+byte ID = 4; //byte
 // LDR VARS
 float M = 1.2;   // Float
 float B = 500.123;// Float

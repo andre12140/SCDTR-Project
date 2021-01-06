@@ -70,6 +70,10 @@ public:
                                      terminated_line.copy(send_buffer, n);
                                      async_write(sock, buffer(send_buffer, n), [this](const boost::system::error_code &err, size_t sz) { std::cout << "Sent " << sz << " bytes" << std::endl; });
                                  }
+                                 if (line[0] == 'q' && line.size() == 1)
+                                 {
+                                     exit(0);
+                                 }
                                  start_read_console();
                              }
                              else

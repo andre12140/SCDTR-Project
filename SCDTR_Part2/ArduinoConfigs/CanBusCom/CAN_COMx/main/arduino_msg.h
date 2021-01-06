@@ -8,7 +8,7 @@
 // Message Protocol
 #define CMDm 0
 #define IDm 1
-
+#define Dm 2
 
 // Comand codes - 6 bits
 // Command code

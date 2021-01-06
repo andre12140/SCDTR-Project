@@ -2,7 +2,7 @@
 #define _MCP2515_H_
 
 #include <SPI.h>
-#include "can.h"
+#include <can.h>
 
 /*
  *  Speed 8M
