@@ -1,5 +1,4 @@
 #include <Arduino.h>
-//#include "canFrameStream.h"
 #include <EEPROM.h>
 #include "system.h"
 #include "EEPROM_data.h"
@@ -7,16 +6,13 @@
 #include "control.h"
 #include "simulator.h"
 #include "state.h"
-
 #include "can_com.h"
 #include "node.h"
 
 MCP2515 mcp2515(10); //SS pin 10
 can_frame_stream cf_stream;
-
 Comunication comObj;
 nodeL nodeList;
-
 System sys;
 Simulation simulator;
 Control controller;
@@ -190,15 +186,11 @@ void receivedMsgSerial()
 void setup()
 {
   Serial.begin(1000000);
-
   sys.configTimers();
-
   readEEPROM();
-
   initCanCom();
 
   nodeList.node_list[0] = nodeList.ID;
-
   nodeList.network_init(); // Listens CANbus for other arduinos until a timeout and defines the list of nodes
   Serial.print("D ANI!\n");
   sys.calibration();
@@ -208,7 +200,6 @@ void setup()
   Serial.println("Gains:");
   Serial.println(sys.k[0]);
   Serial.println(sys.k[1]);
-  Serial.println(sys.k[2]);
 
   controller.initUff();
 }
@@ -251,8 +242,8 @@ void loop()
       sys.newRef = true;
       desk_occ.flag = false;
     }
-    controller.decentralizedCoordControl(simulator.luxSimulator(sys.x_des));
-    controller.dataDisplay();
+
+    controller.decentralizedCoordControl();
     sys.samp = false;
   }
 }

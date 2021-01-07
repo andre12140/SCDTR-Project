@@ -10,7 +10,7 @@ public:
   const float T = 0.01; // Sampling time
   int ui_before = 0;    // Previous integral control
   float y_pred = 0;     // Prediction Obeservation (system simulation)
-  float ki = 200;       // Integral Gain
+  float ki = 0;         // Integral Gain
   float kp = 0;         // Proportional Gain
   int uff = 0;          // Feedforward control term
   int ufb = 0;          // Feedback control term
@@ -26,8 +26,13 @@ public:
   void feedbackControl();
   void feedforwardControl();
   void Decoupled_Fb_Ff_Control(float);
-  void decentralizedCoordControl(float);
+  void decentralizedCoordControl();
   void dataDisplay();
+  float l2_norm();
+  float evaluate_cost();
+  bool check_feasibility();
+  void consensus_iterate();
+  void distributedOptimizationControl();
 };
 
 #endif

@@ -3,12 +3,13 @@
 #include "control.h"
 #include "state.h"
 #include "node.h"
+#include "simulator.h"
 
 extern System sys;
 extern upperLevel desk_occ;
 extern lowLevel desk_free;
-
 extern nodeL nodeList;
+extern Simulation simulator;
 
 void Control::initUff()
 {
@@ -99,7 +100,7 @@ void Control::Decoupled_Fb_Ff_Control(float _simLux)
 }
 
 // Decentralized Coordinated Control
-void Control::decentralizedCoordControl(float _simLux)
+void Control::decentralizedCoordControl()
 {
   // Control the system with the Decentralized Coordinated Algorithm with sequential updates
   //decentralizedCoordControl();
@@ -109,6 +110,7 @@ void Control::decentralizedCoordControl(float _simLux)
   // Compute feedforward everytime there is a new reference to attain
   if (sys.newRef)
   {
+
     // Iterate 25 times
     for (int i = 0; i < 25; i++)
     {
@@ -117,9 +119,12 @@ void Control::decentralizedCoordControl(float _simLux)
       {
         if (nodeList.ID == nodeList.node_list[n])
         {
+
           // Waiting for messages from other nodes with their previous control intent (t-1)
           while (count != nodeList.n_nodes - 1)
           {
+            Serial.print(" ");
+
             if (SPWM_flag)
             {
               SPWM_flag = false;
@@ -160,6 +165,7 @@ void Control::decentralizedCoordControl(float _simLux)
         // To be executed by nodes that are not computing new control intents in the current time step
         else
         {
+
           // Prepares message with the command, node identifier and control intent
           char msg_sendPWM[4];
           msg_sendPWM[0] = send_PWM;
@@ -191,7 +197,7 @@ void Control::decentralizedCoordControl(float _simLux)
 
   // Feedback attenuates disturbances and noise
   // error from simulation
-  e_sim = _simLux - sys.Lux;
+  e_sim = simulator.luxSimulator(sys.x_des) - sys.Lux;
   // error to reference
   e = sys.x_des - sys.Lux;
   // Integral Part
@@ -200,6 +206,17 @@ void Control::decentralizedCoordControl(float _simLux)
   up = kp * e_sim;
   // Control signal
   u = up + ui + uff;
+  // Saturate Integral Term
+  if (u > 255)
+  {
+    ui = 255 - uff - up;
+    u = up + ui + uff;
+  }
+  if (u < 0)
+  {
+    ui = 0 - uff - up;
+    u = up + ui + uff;
+  }
   // Send control signal to LED
   analogWrite(sys.analogOutPin, u);
   // Dead Zone
@@ -207,6 +224,7 @@ void Control::decentralizedCoordControl(float _simLux)
   {
     ui_before = ui;
   }
+  dataDisplay();
 }
 
 // Display control data
