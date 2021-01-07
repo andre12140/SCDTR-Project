@@ -227,10 +227,314 @@ void Control::decentralizedCoordControl()
   dataDisplay();
 }
 
+float Control::l2_norm(float *u, int n)
+{
+  float accum = 0.;
+  for (int i = 0; i < n; ++i)
+  {
+    accum += u[i] * u[i];
+  }
+  return sqrt(accum);
+}
+
+float Control::evaluate_cost(float *c_node, float *y, float *d_avg, float *d, float rho)
+{
+  // gi = ci*di + yi*(di - di_avg) + (rho/2)*square_norm(di - di_avg)
+  float accum = 0;
+  float *aux = (float *)malloc(sizeof(float) * nodeList.n_nodes);
+
+  if (aux == NULL)
+  {
+    Serial.println("Error allocating memory.");
+    exit(0);
+  }
+
+  for (int i = 0; i < nodeList.n_nodes; i++)
+  {
+    accum += c_node[i] * d[i] + y[i] * (d[i] - d_avg[i]);
+    aux[i] = d[i] - d_avg[i];
+  }
+  return accum + rho / 2 * pow(l2_norm((aux), 3), 2);
+}
+
+bool Control::check_feasibility(float *d, float *k)
+{
+  bool check = true;
+  float tol = 0.001; // tolerance for rounding errors
+  float *lum = (float *)malloc(sizeof(float) * nodeList.n_nodes);
+  int idx = nodeList.getNodeIDX(nodeList.ID);
+
+  if (lum == NULL)
+  {
+    Serial.println("Error allocating memory.");
+    exit(0);
+  }
+  memset(lum, 0, sizeof(float) * nodeList.n_nodes);
+
+  // compute the illuminance for the luminaires
+  for (int i = 0; i < nodeList.n_nodes; i++)
+  {
+    lum[i] = d[i] * k[i]; // ORDEM CERTA??????
+  }
+  // violates minimum PWM value
+  if (d[idx] < 0 - tol)
+  {
+    check = false;
+  }
+  // violates maximum PWM value
+  if (d[idx] > 255 + tol)
+  {
+    check = false;
+  }
+  // violates the local illuminance lower bound
+  for (int i = 0; i < nodeList.n_nodes; i++)
+  {
+    if (lum[i] < sys.x_des - sys.o_node - tol)
+    {
+      check = false;
+    }
+  }
+  // Passed the feasibility check
+
+  return check;
+}
+
+float *Control::consensus_iterate(float *c_node, float *d_avg, float *y, float aux_m, float rho, float o_, float L_, float *k, float k_norm)
+{
+
+  float *d_best, *z, *d_u, *d_bl, *d_b0, *d_b255, *d_l0, *d_l255, *d = (float *)malloc(sizeof(float) * nodeList.n_nodes);
+  float *result = (float *)malloc(sizeof(float) * (nodeList.n_nodes + 1));
+  int idx = nodeList.getNodeIDX(nodeList.ID);
+
+  if (d_best == NULL)
+  {
+    Serial.println("Error allocating memory.");
+    exit(0);
+  }
+  memset(d_best, -1, sizeof(float) * nodeList.n_nodes);
+  memset(z, 0, sizeof(float) * nodeList.n_nodes);
+  // unconstrained minimum
+  memset(d_u, 0, sizeof(float) * nodeList.n_nodes);
+  // minimum constrained to linear boundary
+  memset(d_bl, 0, sizeof(float) * nodeList.n_nodes);
+  // minimum constrained to 0 boundary
+  memset(d_b0, 0, sizeof(float) * nodeList.n_nodes);
+  // minimum constrained to 255 boundary
+  memset(d_b255, 0, sizeof(float) * nodeList.n_nodes);
+  // minimum constrained to linear and 0 boundary
+  memset(d_l0, 0, sizeof(float) * nodeList.n_nodes);
+  // minimum constrained to linear and 255 boundary
+  memset(d_l255, 0, sizeof(float) * nodeList.n_nodes);
+  memset(d, 0, sizeof(float) * nodeList.n_nodes);
+  // result
+  memset(result, 0, sizeof(float) * (nodeList.n_nodes + 1));
+
+  // large number
+  int cost_best = 1000000;
+
+  bool sol_unconstrained = true;
+  bool sol_boundary_linear = true;
+  bool sol_boundary_0 = true;
+  bool sol_boundary_255 = true;
+  bool sol_linear_0 = true;
+  bool sol_linear_255 = true;
+
+  float cost_unconstrained = 0;
+  float cost_boundary_linear = 0;
+  float cost_boundary_0 = 0;
+  float cost_boundary_255 = 0;
+  float cost_linear_0 = 0;
+  float cost_linear_255 = 0;
+  float cost = 0;
+
+  for (int i = 0; i < 3; i++)
+  {
+    // Verify ci cost
+    z[i] = rho * d_avg[i] - c_node[i] - y[i];
+  }
+
+  // Solution in the interior
+
+  // unconstrained minimum
+  for (int i = 0; i < 3; i++)
+  {
+    d_u[i] = (1 / rho) * z[i];
+  }
+
+  sol_unconstrained = check_feasibility(d_u, k);
+  if (sol_unconstrained)
+  {
+    // REVISE: IF UNCONSTRAINED SOLUTION EXISTS, THEN IT IS OPTIMAL
+    // NO NEED TO COMPUTE THE OTHER
+    cost_unconstrained = evaluate_cost(c_node, y, d_avg, d_u, rho);
+    if (cost_unconstrained < cost_best)
+    {
+      for (int i = 0; i < 3; i++)
+      {
+        d_best[i] = d_u[i];
+      }
+      cost_best = cost_unconstrained;
+    }
+  }
+
+  // compute minimum constrained to linear boundary
+  for (int i = 0; i < 3; i++)
+  {
+    d_bl[i] = (1 / rho) * z[i] - k[i] / k_norm * (o_ - L_ + (1 / rho) * z[i] * k[i]);
+  }
+  // check feasibility of minimum constrained to linear boundary
+  sol_boundary_linear = check_feasibility(d_bl, k);
+  // compute cost and if best store new optimum
+  if (sol_boundary_linear)
+  {
+    cost_boundary_linear = evaluate_cost(c_node, y, d_avg, d_bl, rho);
+    if (cost_boundary_linear < cost_best)
+    {
+      for (int i = 0; i < 3; i++)
+      {
+        d_best[i] = d_bl[i];
+      }
+      cost_best = cost_boundary_linear;
+    }
+  }
+
+  // compute minimum constrained to 0 boundary
+  for (int i = 0; i < 3; i++)
+  {
+    if (i == idx)
+    {
+      d_b0[i] = 0;
+    }
+    else
+    {
+      d_b0[i] = (1 / rho) * z[i];
+    }
+  }
+
+  // check feasibility of minimum constrained to 0 boundary
+  sol_boundary_0 = check_feasibility(d_b0, k);
+  // compute cost and if best store new optimum
+  if (sol_boundary_0)
+  {
+    cost_boundary_0 = evaluate_cost(c_node, y, d_avg, d_b0, rho);
+    if (cost_boundary_0 < cost_best)
+    {
+      for (int i = 0; i < 3; i++)
+      {
+        d_best[i] = d_b0[i];
+      }
+      cost_best = cost_boundary_0;
+    }
+  }
+
+  // compute minimum constrained to 255 boundary
+  for (int i = 0; i < 3; i++)
+  {
+    if (i == idx)
+    {
+      d_b255[i] = 255;
+    }
+    else
+    {
+      d_b255[i] = (1 / rho) * z[i];
+    }
+  }
+
+  // check feasibility of minimum constrained to 255 boundary
+  sol_boundary_255 = check_feasibility(d_b255, k);
+  // compute cost and if best store new optimum
+  if (sol_boundary_255)
+  {
+    cost_boundary_255 = evaluate_cost(c_node, y, d_avg, d_b255, rho);
+    if (cost_boundary_255 < cost_best)
+    {
+      for (int i = 0; i < 3; i++)
+      {
+        d_best[i] = d_b255[i];
+      }
+      cost_best = cost_boundary_255;
+    }
+  }
+
+  // compute minimum constrained to linear and 0 boundary
+  for (int i = 0; i < 3; i++)
+  {
+    if (i == idx)
+    {
+      d_l0[i] = 0;
+    }
+    else
+    {
+      d_l0[i] = (1 / rho) * z[i] - (1 / aux_m) * k[i] * (o_ - L_) + (1 / rho / aux_m) * k[i] * (k[idx] * z[idx] - z[i] * k[i]);
+    }
+  }
+
+  // check feasibility of minimum constrained to linear and 0 boundary
+  sol_linear_0 = check_feasibility(d_l0, k);
+  //  compute cost and if best store new optimum
+  if (sol_linear_0)
+  {
+    cost_linear_0 = evaluate_cost(c_node, y, d_avg, d_l0, rho);
+    if (cost_linear_0 < cost_best)
+    {
+      for (int i = 0; i < 3; i++)
+      {
+        d_best[i] = d_l0[i];
+      }
+      cost_best = cost_linear_0;
+    }
+  }
+
+  // compute minimum constrained to linear and 255 boundary
+  for (int i = 0; i < 3; i++)
+  {
+    if (i == idx)
+    {
+      d_l255[i] = 255;
+    }
+    else
+    {
+      d_l255[i] = (1 / rho) * z[i] - (1 / aux_m) * k[i] * (o_ - L_ + 255 * k[idx]) + (1 / rho / aux_m) * k[i] * (k[idx] * z[idx] - z[i] * k[i]);
+    }
+  }
+
+  // check feasibility of minimum constrained to linear and 255 boundary
+  sol_linear_0 = check_feasibility(d_l255, k);
+  // compute cost and if best store new optimum
+  if (sol_linear_0)
+  {
+    cost_linear_255 = evaluate_cost(c_node, y, d_avg, d_l255, rho);
+    if (cost_linear_255 < cost_best)
+    {
+      for (int i = 0; i < 3; i++)
+      {
+        d_best[i] = d_l255[i];
+      }
+      cost_best = cost_linear_255;
+    }
+  }
+  for (int i = 0; i < 3; i++)
+  {
+    d[i] = d_best[i];
+  }
+  cost = cost_best;
+
+  for (int i = 0; i < 3; i++)
+  {
+    result[i] = d[i];
+  }
+  result[4] = cost;
+
+  return result;
+}
+
+void distributedOptimizationControl()
+{
+}
+
 // Display control data
 void Control::dataDisplay()
 {
-
   Serial.print(millis());
   Serial.print(",     ");
   Serial.print(sys.x_des);

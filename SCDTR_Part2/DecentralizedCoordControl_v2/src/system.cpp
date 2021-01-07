@@ -14,6 +14,17 @@ void System::readingsLDR()
   Lux = pow(10, (log10(R2) - b) / m);
 }
 
+void System::initGainMatrix()
+{
+  k = (float *)malloc(sizeof(float) * nodeList.n_nodes);
+  if (k == NULL)
+  {
+    Serial.println("Error allocating memory.");
+    exit(0);
+  }
+  memset(k, 0, sizeof(float) * nodeList.n_nodes);
+}
+
 void System::get_o()
 {
   // External disturbances when all LED's are turned off
@@ -27,7 +38,7 @@ void System::calibration()
   can_frame frame;
   int i = 0;
   int count = 0;
-
+  initGainMatrix();
   nodeList.sortNodes();
   get_o();
 

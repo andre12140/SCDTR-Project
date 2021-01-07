@@ -9,6 +9,9 @@
 #include "can_com.h"
 #include "node.h"
 
+#define rho 0.07
+#define maxiter 50
+
 MCP2515 mcp2515(10); //SS pin 10
 can_frame_stream cf_stream;
 Comunication comObj;

@@ -28,10 +28,10 @@ public:
   void Decoupled_Fb_Ff_Control(float);
   void decentralizedCoordControl();
   void dataDisplay();
-  float l2_norm();
-  float evaluate_cost();
-  bool check_feasibility();
-  void consensus_iterate();
+  float l2_norm(float *, int);
+  float evaluate_cost(float *, float *, float *, float *, float);
+  bool check_feasibility(float *, float *);
+  float *consensus_iterate(float *, float *, float *, float, float, float, float, float *, float);
   void distributedOptimizationControl();
 };
 

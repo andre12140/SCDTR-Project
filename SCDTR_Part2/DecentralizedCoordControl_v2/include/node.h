@@ -39,6 +39,18 @@ public:
         }
     }
 
+    int getNodeIDX(uint8_t ID_)
+    {
+        int j = 0;
+        // Establish the order to save the previous control intents in vector uff_PWM
+        for (j = 0; j < nodeList.n_nodes; j++)
+        {
+            if (nodeList.node_list[j] == ID_)
+                break;
+        }
+        return j;
+    }
+
     bool checkID(uint8_t id)
     { // Checks if the given id is a member of the node network
         for (int i = 0; i < n_nodes; i++)

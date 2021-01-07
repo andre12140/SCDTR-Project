@@ -62,8 +62,15 @@ public:
   float tau_zero = 0;
   float Lux = 0;
   float o_node = 0;
-  float k[3];
+  float *k;
+  float ci = 0; // local cost
+  float *c_node = 0;
+  float *y;     // lagrange multipliers
+  float *d_avg; // duty Cycle Average
+  float *d;
+  float k_norm = 0;
   float x_des = 0; // Desired State (Lux)
+  float aux_m = 0;
 
   // Flags and Counters
   bool calib_node0starts = false;
@@ -79,7 +86,7 @@ public:
   void get_o();
 
   void configTimers();
-
+  void initGainMatrix();
   void stepGenerator();
   void readingsLDR();
   void tauCalculator();
