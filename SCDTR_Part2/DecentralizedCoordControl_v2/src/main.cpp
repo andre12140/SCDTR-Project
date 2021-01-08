@@ -10,7 +10,6 @@
 #include "node.h"
 
 #define rho 0.07
-#define maxiter 50
 
 MCP2515 mcp2515(10); //SS pin 10
 can_frame_stream cf_stream;
@@ -21,9 +20,7 @@ Simulation simulator;
 Control controller;
 upperLevel desk_occ;
 lowLevel desk_free;
-
 String arduinoMessage;
-
 String serverMessage;
 
 ISR(TIMER1_COMPA_vect)
@@ -59,38 +56,43 @@ void irqHandler()
     mcp2515.clearRXnOVRFlags();
   }
   mcp2515.clearInterrupts();
-  //Serial.print("Msg Received from ");
-  //Serial.println(frm.can_id);
+
+  /*   Serial.print("\n Msg from ");
+  Serial.println(frm.can_id);
+  Serial.println("--");
+  Serial.println((int)frm.data[IDm]);
+  Serial.println(nodeList.ID); */
 
   if (nodeList.initializing_network && frm.data[0] == NID)
   {
-    //Serial.println("Received NID");
+    /* Serial.println("Received NID"); */
     nodeList.new_node = true;
     nodeList.EONI_flag = true;
   }
   // (Calibration) Nodes are ready to compute coupling gains
-  else if (frm.data[CMDm] == compute_CG)
+  else if ((frm.data[CMDm] == compute_CG) && sys.CALIB)
   {
     sys.CCG_flag = true;
   }
   // (Calibration) Nodes are ready to send coupling gains
-  else if (frm.data[CMDm] == send_CG)
+  else if ((frm.data[CMDm] == send_CG) && sys.CALIB && ((uint8_t)(frm.data[IDm]) == nodeList.ID))
   {
     sys.SCG_flag = true;
   }
   // (Controller) Nodes share their control intent
-  else if (frm.data[CMDm] == send_PWM)
+  else if ((frm.data[CMDm] == send_PWM) && (controller.CONTROL) && ((uint8_t)(frm.data[IDm]) == nodeList.ID))
   {
     controller.SPWM_flag = true;
+    /*     Serial.print(frm.can_id);
+    Serial.println(" - [SPWM] "); */
   }
-  else
+  else if (!(controller.CONTROL) && (!(nodeList.initializing_network)) && (!sys.CALIB))
   {
-    //Serial.println("INTERRUPt = TRUE");
+    /*     Serial.println("HUB");
+    Serial.println(frm.data[IDm]);
+    Serial.println(nodeList.ID); */
     comObj.interruptCanMsg = true; //notify loop()
   }
-  /*   Serial.print("INTERRUP");
-  Serial.print(" from ID ");
-  Serial.println(frm.can_id); */
 } //end irqHandler()
 
 void initCanCom()
@@ -195,7 +197,11 @@ void setup()
 
   nodeList.node_list[0] = nodeList.ID;
   nodeList.network_init(); // Listens CANbus for other arduinos until a timeout and defines the list of nodes
+
   Serial.print("D ANI!\n");
+
+  delay(500);
+
   sys.calibration();
 
   Serial.println("Calibration ended");
@@ -203,6 +209,7 @@ void setup()
   Serial.println("Gains:");
   Serial.println(sys.k[0]);
   Serial.println(sys.k[1]);
+  Serial.println(sys.k[2]);
 
   controller.initUff();
 }

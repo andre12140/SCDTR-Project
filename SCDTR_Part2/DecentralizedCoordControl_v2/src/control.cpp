@@ -10,6 +10,7 @@ extern upperLevel desk_occ;
 extern lowLevel desk_free;
 extern nodeL nodeList;
 extern Simulation simulator;
+extern Control controller;
 
 void Control::initUff()
 {
@@ -102,8 +103,9 @@ void Control::Decoupled_Fb_Ff_Control(float _simLux)
 // Decentralized Coordinated Control
 void Control::decentralizedCoordControl()
 {
+  CONTROL = true;
+  Serial.println("Start of control routine");
   // Control the system with the Decentralized Coordinated Algorithm with sequential updates
-  //decentralizedCoordControl();
   can_frame frame;
   int count = 0;
 
@@ -111,42 +113,61 @@ void Control::decentralizedCoordControl()
   if (sys.newRef)
   {
 
-    // Iterate 25 times
-    for (int i = 0; i < 25; i++)
+    // Iterate
+    for (int i = 0; i < maxiterCoord; i++)
     {
+      Serial.print("Iter: ");
+      Serial.println(i);
+
       // Identify the node that is computing the feedforward control intent
       for (int n = 0; n < nodeList.n_nodes; n++)
       {
+        Serial.print(" ");
         if (nodeList.ID == nodeList.node_list[n])
         {
-
           // Waiting for messages from other nodes with their previous control intent (t-1)
-          while (count != nodeList.n_nodes - 1)
+          while (count < (nodeList.n_nodes - 1))
           {
             Serial.print(" ");
-
+            // Ready to receive the messages
             if (SPWM_flag)
             {
-              SPWM_flag = false;
-              count++;
 
+              bool has_data;
               cli();
-              cf_stream.get(frame);
+              has_data = cf_stream.get(frame);
               sei();
-
-              int j = 0;
-              // Establish the order to save the previous control intents in vector uff_PWM
-              for (j = 0; j < nodeList.n_nodes; j++)
+              while (has_data)
               {
-                if (nodeList.node_list[j] == frame.can_id)
-                  break;
+                Serial.println("has data");
+                if ((frame.data[CMDm] == send_PWM) && (frame.data[IDm] == (nodeList.ID)))
+                {
+
+                  count++;
+
+                  // Establish the order to save the previous control intents in vector uff_PWM
+                  int j = nodeList.getNodeIDX(frame.can_id);
+                  if (j == -1)
+                  {
+                    Serial.println("Index error");
+                    exit(0);
+                  }
+                  // Saving in memory (vector uff_PWM) all control intents
+                  memcpy(&(uff_PWM[j]), &(frame.data[Dm]), sizeof(int));
+                }
+
+                cli();
+                has_data = cf_stream.get(frame);
+                sei();
               }
-              memcpy(&(uff_PWM[j]), &(frame.data[2]), sizeof(int));
+              SPWM_flag = false;
             }
           }
           count = 0;
           // Start computing the new control intent (t)
           uff_PWM[n] = sys.x_des - sys.o_node;
+          Serial.print("L-o = ");
+          Serial.println(uff_PWM[n]);
 
           for (int w = 0; w < nodeList.n_nodes; w++)
           {
@@ -158,38 +179,48 @@ void Control::decentralizedCoordControl()
             // Subtracts the influence in terms of lux from the other nodes,
             // according to their control intents in previous time step
             uff_PWM[n] -= uff_PWM[w] * sys.k[w];
+            Serial.print("from node: ");
+            Serial.println(w);
+            Serial.println(uff_PWM[w]);
+            Serial.print("Accum: ");
+            Serial.println(uff_PWM[n]);
           }
           // Finalizes the computation by dividing the attained lux values by its own gain
           uff_PWM[n] = uff_PWM[n] / sys.k[n];
+
+          Serial.print("Self control: ");
+          Serial.println(uff_PWM[n]);
         }
         // To be executed by nodes that are not computing new control intents in the current time step
         else
         {
-
+          Serial.println("Nodes outside");
           // Prepares message with the command, node identifier and control intent
-          char msg_sendPWM[4];
-          msg_sendPWM[0] = send_PWM;
-          msg_sendPWM[1] = nodeList.node_list[n];
+          msg_sendPWM[CMDm] = send_PWM;
+          msg_sendPWM[IDm] = nodeList.node_list[n];
 
-          int j = 0;
           // Establish the right order to save control intents
-          for (j = 0; j < nodeList.n_nodes; j++)
+          int j = nodeList.getNodeIDX(nodeList.ID);
+          if (j == -1)
           {
-            if (nodeList.node_list[j] == nodeList.ID)
-              break;
+            Serial.println("Index error");
+            exit(0);
           }
-          memcpy(&msg_sendPWM[2], &(uff_PWM[j]), sizeof(int));
+          memcpy(&msg_sendPWM[Dm], &(uff_PWM[j]), sizeof(int));
           comObj.write(nodeList.ID, msg_sendPWM, 4);
         }
+        delay(1);
       }
     }
 
-    int j = 0;
+    CONTROL = false;
+
     // Establish the order to save control intents in vector uff_PWM
-    for (j = 0; j < nodeList.n_nodes; j++)
+    int j = nodeList.getNodeIDX(nodeList.ID);
+    if (j == -1)
     {
-      if (nodeList.node_list[j] == nodeList.ID)
-        break;
+      Serial.println("Index error");
+      exit(0);
     }
     // Saving the new feedforward component that accounts the accessible disturbances
     uff = uff_PWM[j];
@@ -257,49 +288,49 @@ float Control::evaluate_cost(float *c_node, float *y, float *d_avg, float *d, fl
   return accum + rho / 2 * pow(l2_norm((aux), 3), 2);
 }
 
-bool Control::check_feasibility(float *d, float *k)
-{
-  bool check = true;
-  float tol = 0.001; // tolerance for rounding errors
-  float *lum = (float *)malloc(sizeof(float) * nodeList.n_nodes);
-  int idx = nodeList.getNodeIDX(nodeList.ID);
+// bool Control::check_feasibility(float *d, float *k)
+// {
+//   bool check = true;
+//   float tol = 0.001; // tolerance for rounding errors
+//   float *lum = (float *)malloc(sizeof(float) * nodeList.n_nodes);
+//   int idx = nodeList.getNodeIDX(nodeList.ID);
 
-  if (lum == NULL)
-  {
-    Serial.println("Error allocating memory.");
-    exit(0);
-  }
-  memset(lum, 0, sizeof(float) * nodeList.n_nodes);
+//   if (lum == NULL)
+//   {
+//     Serial.println("Error allocating memory.");
+//     exit(0);
+//   }
+//   memset(lum, 0, sizeof(float) * nodeList.n_nodes);
 
-  // compute the illuminance for the luminaires
-  for (int i = 0; i < nodeList.n_nodes; i++)
-  {
-    lum[i] = d[i] * k[i]; // ORDEM CERTA??????
-  }
-  // violates minimum PWM value
-  if (d[idx] < 0 - tol)
-  {
-    check = false;
-  }
-  // violates maximum PWM value
-  if (d[idx] > 255 + tol)
-  {
-    check = false;
-  }
-  // violates the local illuminance lower bound
-  for (int i = 0; i < nodeList.n_nodes; i++)
-  {
-    if (lum[i] < sys.x_des - sys.o_node - tol)
-    {
-      check = false;
-    }
-  }
-  // Passed the feasibility check
+//   // compute the illuminance for the luminaires
+//   for (int i = 0; i < nodeList.n_nodes; i++)
+//   {
+//     lum[i] = d[i] * k[i]; // ORDEM CERTA??????
+//   }
+//   // violates minimum PWM value
+//   if (d[idx] < 0 - tol)
+//   {
+//     check = false;
+//   }
+//   // violates maximum PWM value
+//   if (d[idx] > 255 + tol)
+//   {
+//     check = false;
+//   }
+//   // violates the local illuminance lower bound
+//   for (int i = 0; i < nodeList.n_nodes; i++)
+//   {
+//     if (lum[i] < sys.x_des - sys.o_node - tol)
+//     {
+//       check = false;
+//     }
+//   }
+//   // Passed the feasibility check
 
-  return check;
-}
+//   return check;
+// }
 
-float *Control::consensus_iterate(float *c_node, float *d_avg, float *y, float aux_m, float rho, float o_, float L_, float *k, float k_norm)
+/* float *Control::consensus_iterate(float *c_node, float *d_avg, float *y, float aux_m, float rho, float o_, float L_, float *k, float k_norm)
 {
 
   float *d_best, *z, *d_u, *d_bl, *d_b0, *d_b255, *d_l0, *d_l255, *d = (float *)malloc(sizeof(float) * nodeList.n_nodes);
@@ -527,10 +558,53 @@ float *Control::consensus_iterate(float *c_node, float *d_avg, float *y, float a
 
   return result;
 }
+ */
+// float *distributedOptimizationControl(float rho, int maxiter)
+// {
+//   float *result;
 
-void distributedOptimizationControl()
-{
-}
+//   // Initial condition (iteration = 1)
+//   /*     d11(1) = node1.d(1);
+//     d12(1) = node1.d(2);
+//     d21(1) = node2.d(1);
+//     d22(1) = node2.d(2);
+//     av1(1) = (d11(1)+d21(1))/2;
+//     av2(1) = (d12(1)+d22(1))/2; */
+
+//   // iterations
+//   for (int i = 1; i <= maxiter; i++)
+//   {
+//     // COMPUTATION OF THE PRIMAL SOLUTIONS
+//     result = controller.consensus_iterate(sys.c_node, sys.d_avg, sys.y, sys.aux_m, rho, sys.o_node, sys.x_des, sys.k, sys.k_norm);
+
+//     for (int j = 0; j < 3; j++)
+//     {
+
+//       sys.d[j] = result[j];
+//     }
+
+//     // Nodes exchange their solutions
+//     //
+
+//     for (int j = 0; j < 3; j++)
+//     {
+//       // COMPUTATION OF THE AVERAGE
+//       sys.d_avg[j] = (sys.d[j] + sys.d[j] + sys.d[j]) / 3;
+
+//       // COMPUTATION OF THE LAGRANGIAN UPDATES
+//       sys.y[j] = sys.y[j] + rho * (sys.d[j] - sys.d_avg[j]);
+
+//       // SAVING DATA FOR PLOTS
+//       /*     d11(i) = node1.d(1);
+//             d12(i) = node1.d(2);
+//             d21(i) = node2.d(1);
+//             d22(i) = node2.d(2);
+//             av1(i) = (d11(i)+d21(i))/2;
+//             av2(i) = (d12(i)+d22(i))/2; */
+//     }
+//   }
+//   //return d_avg;
+// }
 
 // Display control data
 void Control::dataDisplay()

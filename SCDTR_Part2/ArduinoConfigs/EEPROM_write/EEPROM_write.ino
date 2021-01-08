@@ -22,20 +22,20 @@
 
 // --- VARIABLE DECLARATION ---
 // ARDUINO/LDR VARIABLES
-byte ID = 4; //byte
+byte ID = 2; //byte
 // LDR VARS
-float M = 1.2;   // Float
-float B = 500.123;// Float
+float M = -0.6901;   // Float
+float B = 4.595;// Float
 // R2 MODELATION
-float R2_BASE = 0.09;// Float
-float R2_EXP = 13.0001;// Float
+float R2_BASE = 39356;// Float
+float R2_EXP = -0.69;// Float
 // TAU MODELATION
-float TAU_A = 170.0;// Float
-float TAU_B = 2100.12;// Float
-float TAU0 = 2;
+float TAU_A = -1232;// Float
+float TAU_B = 60654;// Float
+float TAU0 = 55000;
 // PI CONTROLLER
-float KP = 0.1;
-float KI = 10;
+float KP = 0;
+float KI = 200;
 
 float CHECKSUM =0; //Float 
 

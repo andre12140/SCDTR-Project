@@ -1,11 +1,16 @@
 #ifndef _control_
 #define _control_
 
+#define maxiterConsens 50
+#define maxiterCoord 25
+
 class Control
 {
 private:
 public:
+  char msg_sendPWM[4];
   bool SPWM_flag = false;
+  bool CONTROL = false;
 
   const float T = 0.01; // Sampling time
   int ui_before = 0;    // Previous integral control

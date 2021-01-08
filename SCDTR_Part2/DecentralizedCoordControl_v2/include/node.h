@@ -43,12 +43,12 @@ public:
     {
         int j = 0;
         // Establish the order to save the previous control intents in vector uff_PWM
-        for (j = 0; j < nodeList.n_nodes; j++)
+        for (j = 0; j < n_nodes; j++)
         {
-            if (nodeList.node_list[j] == ID_)
-                break;
+            if (node_list[j] == ID_)
+                return j;
         }
-        return j;
+        return -1;
     }
 
     bool checkID(uint8_t id)
@@ -68,7 +68,7 @@ public:
     {
         can_frame frame;
         Serial.print(ID);
-        Serial.println("Intializing network...");
+        Serial.println(" - Initializing network...");
         unsigned long time_ref = millis(); // Initial time stamp
                                            // Flag to indentify End Of Network Identification cycle
         while ((millis() - time_ref < 20000))
@@ -81,10 +81,10 @@ public:
                 sei();
                 //Serial.println(frame.data[0]);
                 n_nodes++; // incrementes number of nodes
-                realloc(node_list, n_nodes);
+                node_list = (uint8_t *)realloc(node_list, n_nodes);
                 node_list[n_nodes - 1] = frame.can_id; // Adds new node ID to list of nodes
-                Serial.print("Identified node ID: ");
-                Serial.println(frame.can_id);
+                // Serial.print("Identified node ID: ");
+                // Serial.println(frame.can_id);
                 break;
             }
             if ((millis() - t) >= 1000)
@@ -93,10 +93,9 @@ public:
                 t = millis();
             }
         }
-        //Serial.print("D 20s\n");
-        Serial.println("20s passed OR EONI Flag received!");
-        //Serial.println(millis() - time_ref);
 
+        Serial.println("20s passed OR EONI Flag received!");
+        delay(ID * 10 + 15);
         comObj.write_byte(ID, NID);        // Broadcasts own ID
         time_ref = millis();               // New time stamp
         while (millis() - time_ref < 5000) // Listens for other nodes
@@ -110,10 +109,10 @@ public:
                 sei();
                 //Serial.println(frame.data[0]);
                 n_nodes++; // incrementes number of nodes
-                realloc(node_list, n_nodes);
+                node_list = (uint8_t *)realloc(node_list, n_nodes);
                 node_list[n_nodes - 1] = frame.can_id; // Adds new node ID to list of nodes
-                Serial.print("Identified node ID: ");
-                Serial.println(frame.can_id);
+                // Serial.print("Identified node ID: ");
+                // Serial.println(frame.can_id);
             }
         }
 

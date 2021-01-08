@@ -106,6 +106,8 @@ void loop()
       for (int i = 0; i < 4; i++)
         msg.bytes[i] = frame.data[i];
       Serial.print("\t\tReceiving: ");
+      Serial.print(frame.can_id);
+      Serial.print("  ");
       Serial.println(msg.value);
       cli();
       has_data = cf_stream.get(frame);
