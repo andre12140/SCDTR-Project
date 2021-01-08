@@ -112,7 +112,7 @@ void Control::decentralizedCoordControl()
   // Compute feedforward everytime there is a new reference to attain
   if (sys.newRef)
   {
-
+    simulator.luxSimulator(sys.x_des);
     // Iterate
     for (int i = 0; i < maxiterCoord; i++)
     {

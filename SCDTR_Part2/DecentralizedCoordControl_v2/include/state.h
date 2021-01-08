@@ -14,7 +14,7 @@ class lowLevel
 {
 public:
   bool flag = true;
-  int lowRef = 40;
+  int lowRef = 80;
 };
 
 #endif
