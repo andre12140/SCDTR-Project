@@ -226,44 +226,47 @@ public:
         {
             msg[0] = (o | 0x80) & 0xBF;
             char subs_string[10] = {0}; // Conversion of string ID to int
-            memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+            memcpy(subs_string, &cmd_cv[2], strlen(cmd_cv) - 2 - 1);
 
             char *tok;
             tok = strtok(subs_string, " ");
             int x = atoi(tok);
             memcpy(&msg[1], &x, 1); // <i>
-            tok = strtok(subs_string, " ");
-            x = atoi(tok);
-            memcpy(&msg[2], &x, 1); // <val>
+            tok = strtok(NULL, " ");
+            bool val = atoi(tok);
+            memcpy(&msg[2], &val, 1); // <val>
         }
 
         else if (cmd_cv[0] == 'O') //Set lower bound on illuminance for occupancy state at desk <i>
         {
             msg[0] = (O | 0x80) & 0xBF;
             char subs_string[10] = {0}; // Conversion of string ID to int
-            memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+            memcpy(subs_string, &cmd_cv[2], strlen(cmd_cv) - 2 - 1); // val
 
             char *tok;
             tok = strtok(subs_string, " ");
             int x = atoi(tok);
             memcpy(&msg[1], &x, 1); // <i>
-            tok = strtok(subs_string, " ");
+            tok = strtok(NULL, " ");
             float y = atof(tok);
+            y += 0.01;
             memcpy(&msg[2], &y, sizeof(float)); // <val>
+
         }
 
         else if (cmd_cv[0] == 'U') // Set lower bound on illuminance for Unccupied state at desk <i>
         {
             msg[0] = (U | 0x80) & 0xBF;
             char subs_string[10] = {0}; // Conversion of string ID to int
-            memcpy(subs_string, &cmd_cv[4], strlen(cmd_cv) - 4 - 1);
+            memcpy(subs_string, &cmd_cv[2], strlen(cmd_cv) - 2 - 1);
 
             char *tok;
             tok = strtok(subs_string, " ");
             int x = atoi(tok);
             memcpy(&msg[1], &x, 1); // <i>
-            tok = strtok(subs_string, " ");
+            tok = strtok(NULL, " ");
             float y = atof(tok);
+            y += 0.01;
             memcpy(&msg[2], &y, sizeof(float)); // <val>
         }
 
@@ -391,7 +394,7 @@ class server
     {
         if (read_buf.in_avail() > 0) // If there's bytes to send in buffer
         {
-            std::cout << "RU Depois de ler do arduino, in avail:" << read_buf.in_avail() << std::endl;
+            //std::cout << "RU Depois de ler do arduino, in avail:" << read_buf.in_avail() << std::endl;
             memset(buf_cpy, 0, MSG_SIZE);
             read_buf.sgetn(buf_cpy, sz); // Copy from read_buf (received msg from arduino)
 

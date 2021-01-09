@@ -6,6 +6,7 @@
 #include "can_com.h"
 #include "arduino_msg.h"
 
+#define INIT_TIME 5000
 extern can_frame_stream cf_stream;
 
 extern Comunication comObj;
@@ -71,7 +72,7 @@ public:
         Serial.println(" - Initializing network...");
         unsigned long time_ref = millis(); // Initial time stamp
                                            // Flag to indentify End Of Network Identification cycle
-        while ((millis() - time_ref < 20000))
+        while ((millis() - time_ref < INIT_TIME))
         {
             if (EONI_flag == true)
             {
@@ -89,16 +90,17 @@ public:
             }
             if ((millis() - t) >= 1000)
             {
+                Serial.print("D ");
                 Serial.println((t++) / 1000);
                 t = millis();
             }
         }
 
-        Serial.println("20s passed OR EONI Flag received!");
+        Serial.println("D 20s passed OR EONI Flag received!");
         delay(ID * 10 + 15);
         comObj.write_byte(ID, NID);        // Broadcasts own ID
         time_ref = millis();               // New time stamp
-        while (millis() - time_ref < 5000) // Listens for other nodes
+        while (millis() - time_ref < 1000) // Listens for other nodes
         {
             if (new_node)
             {

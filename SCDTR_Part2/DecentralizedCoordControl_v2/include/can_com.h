@@ -4,9 +4,15 @@
 #include <Arduino.h>
 #include "canFrameStream.h"
 #include "arduino_msg.h"
+#include "state.h"
+#include "control.h"
 
 extern MCP2515 mcp2515; //SS pin 10
 extern can_frame_stream cf_stream;
+extern upperLevel desk_occ;
+extern lowLevel desk_free;
+extern System sys;
+extern Control controller;
 
 class Comunication
 {
@@ -23,9 +29,6 @@ public:
     volatile bool interruptCanMsg = false;
     volatile bool mcp2515_overflow = false;
     volatile bool arduino_overflow = false;
-
-    // FUNCTION AUXILIARY VARIABLES
-    float PJ = 0.05; //maximum power
 
     float system_cmd_total = 0; // Sum of values of each node in the network
 
@@ -109,7 +112,7 @@ public:
                     new_str[IDm] = (char)frame.can_id;                               // Adds arduino ID
                     new_str[IDm] = (new_str[IDm] & 0x1F) | (frame.data[IDm] & 0xE0); // Adds client ID to high part of byte
 
-                    uint8_t n = executes(new_str); // return number of bytes of arduinoMessage
+                    uint8_t n = executes(new_str, node_list, n_nodes, ID); // return number of bytes of arduinoMessage
                     write(ID, new_str, n);
                     if ((new_str[CMDm] & 0x3F) == r) // if reset command
                     {
@@ -190,6 +193,7 @@ public:
 
     bool check_cmd_ID(uint8_t cmd, uint8_t id_byte, uint8_t n_nodes, uint8_t *node_list, uint8_t ID_)
     {
+
         cmd = cmd & 0x3F; // Clears 1st two bits
 
         if (cmd == gpT)
@@ -454,61 +458,88 @@ public:
         }
     }
 
-    uint8_t executes(char *cmd) // Executes the function associated with the requested command. Returns nomber of bytes of the return msg.
+    uint8_t executes(char *cmd, uint8_t *nodeList, uint8_t n_nodes, uint8_t ID) // Executes the function associated with the requested command. Returns nomber of bytes of the return msg.
     {
+
         if ((cmd[CMDm] & 0x3F) == gl)
         { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
-            float a = 12.34;
+            float a = sys.Lux;
             memcpy(&cmd[Dm], &a, sizeof(float));
             return 6; // returns number of bytes
         }
 
         else if ((cmd[CMDm] & 0x3F) == gd)
         { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
-            float a = 23.45;
+            float a = controller.u;
             memcpy(&cmd[Dm], &a, sizeof(float));
             return 6; // returns number of bytes
         }
 
         else if ((cmd[CMDm] & 0x3F) == go)
         { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
-            bool a = true;
-            memcpy(&cmd[Dm], &a, sizeof(bool));
+            bool state;
+            if (desk_free.flag)
+            {
+                state = false;
+            }
+            else if (desk_occ.flag)
+            {
+                state = true;
+            }
+            memcpy(&cmd[Dm], &state, sizeof(bool));
             return 3; // returns number of bytes
         }
 
         else if ((cmd[CMDm] & 0x3F) == gO)
         { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
-            float a = 52.34;
+            float a = (float)(desk_occ.upperRef) + 0.01;
             memcpy(&cmd[Dm], &a, sizeof(float));
             return 6; // returns number of bytes
         }
 
         else if ((cmd[CMDm] & 0x3F) == gU)
         { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
-            float a = 37.34;
+            float a = (float)(desk_free.lowRef) + 0.01;
             memcpy(&cmd[Dm], &a, sizeof(float));
             return 6; // returns number of bytes
         }
 
         else if ((cmd[CMDm] & 0x3F) == gL)
         { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
-            float a = 12.92;
-            memcpy(&cmd[Dm], &a, sizeof(float));
+            float ref;
+            if (desk_free.flag)
+            {
+                ref = (float)desk_free.lowRef;
+            }
+            else if (desk_occ.flag)
+            {
+                ref = (float)desk_occ.upperRef;
+            }
+            ref += 0.01;
+            memcpy(&cmd[Dm], &ref, sizeof(float));
             return 6; // returns number of bytes
         }
 
         else if ((cmd[CMDm] & 0x3F) == gx)
         { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
-            float a = 65.34;
+            float a = sys.o_node + 0.01;
             memcpy(&cmd[Dm], &a, sizeof(float));
             return 6; // returns number of bytes
         }
 
         else if ((cmd[CMDm] & 0x3F) == gr)
         { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
-            float a = 61.34;
-            memcpy(&cmd[Dm], &a, sizeof(float));
+            int i;
+
+            for (i = 0; i < n_nodes; i++)
+            {
+                if (nodeList[i] == ID)
+                {
+                    break;
+                }
+            }
+            float u = controller.u * sys.k[i];
+            memcpy(&cmd[Dm], &u, sizeof(float));
             return 6; // returns number of bytes
         }
 
@@ -516,15 +547,14 @@ public:
         {                  // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
             float a = 255; // DUTY CYCLE
 
-            float e = PJ * (a / 255) * 0.01; // Current energy consumption
-            memcpy(&cmd[Dm], &e, sizeof(float));
+            memcpy(&cmd[Dm], &a, sizeof(float));
             return 6; // returns number of bytes
         }
 
         else if ((cmd[CMDm] & 0x3F) == gp)
-        { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
-            float a = 1234.01;
-            memcpy(&cmd[Dm], &a, sizeof(float));
+        {                                           // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+            float e = sys.PJ * controller.u * 0.01; //PJ * PWM *St
+            memcpy(&cmd[Dm], &e, sizeof(float));
             return 6; // returns number of bytes
         }
 
@@ -544,8 +574,8 @@ public:
 
         else if ((cmd[CMDm] & 0x3F) == gv)
         { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
-            float a = 13.34;
-            memcpy(&cmd[Dm], &a, sizeof(float));
+            float v_e = sys.visibility_error + 0.01;
+            memcpy(&cmd[Dm], &v_e, sizeof(float));
             return 6; // returns number of bytes
         }
 
@@ -557,25 +587,46 @@ public:
         }
 
         else if ((cmd[CMDm] & 0x3F) == o)
-        {             // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
-            return 6; // returns number of bytes
+        { // Get current measured illuminance at desk <i>   (AND 0x3F to clear signal bits)
+            desk_free.flag = !desk_free.flag;
+            desk_occ.flag = !desk_occ.flag;
+
+            if (desk_occ.flag == true)
+            {
+                sys.x_des = desk_occ.upperRef;
+            }
+            else if (desk_free.flag == true)
+            {
+                sys.x_des = desk_free.lowRef;
+            }
+            sys.newRef = true;
+
+            return 6;
         }
 
         else if ((cmd[CMDm] & 0x3F) == O)
         {
-            return 6; // returns number of bytes
+            float val;
+            memcpy(&val, &(cmd[Dm]), sizeof(float));
+            desk_occ.upperRef = (int)val;
+            cmd[Dm] = 1; // Return ACK
+            return 3;    // returns number of bytes
         }
 
         else if ((cmd[CMDm] & 0x3F) == U)
         {
-            return 6; // returns number of bytes
+            float val;
+            memcpy(&val, &(cmd[Dm]), sizeof(float));
+            desk_free.lowRef = (int)val;
+            cmd[Dm] = 1; // Return ACK
+            return 3;    // returns number of bytes
         }
 
         else if ((cmd[CMDm] & 0x3F) == c)
         {
             float e = 1; // DUTY CYCLE
 
-            float a = e * (255 / (PJ * 0.01)); // Current energy consumption
+            float a = e * (255 / (sys.PJ * 0.01)); // Current energy consumption
             // set PWM with 'a' [TO DO!]
             //bool a = true;
             memcpy(&cmd[Dm], &a, sizeof(bool));

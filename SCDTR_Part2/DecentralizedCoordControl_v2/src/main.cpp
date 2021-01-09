@@ -27,6 +27,8 @@ ISR(TIMER1_COMPA_vect)
 {
   sys.samp = true;
   // At each sampling time read from LDR
+  sys.Lux_prev2 = sys.Lux_prev1; // LUX measurement of t-2
+  sys.Lux_prev1 = sys.Lux;       // LUX measurement of t-1
   sys.readingsLDR();
 }
 
@@ -162,16 +164,18 @@ void receivedMsgSerial()
   {
     Serial.print("D Hub arduino got the command and replies\n");
     // Meter todos os casos possiveis numa função!
+    char *aux_msg = (char *)(serverMessage.c_str());
 
-    comObj.executes((char *)(serverMessage.c_str()));
-    Serial.print("D serverMessage[Dm] ");
-    Serial.println(serverMessage[Dm]);
+    comObj.executes(aux_msg, nodeList.node_list, nodeList.n_nodes, nodeList.ID);
     // Processa a mensagem e retorna para o Server
     Serial.print("C");
     Serial.println(comObj.processes_cmd(serverMessage));
   }
   else // If message is for an arduino of the network
   {
+    Serial.print("D BYTE IDM ");
+    Serial.println(uint8_t(serverMessage[IDm] & 0x1F), HEX);
+
     if (nodeList.checkID(serverMessage[IDm] & 0x1F))
     {
       Serial.print("D HUB arduino relays message to network\n");
@@ -182,7 +186,6 @@ void receivedMsgSerial()
     }    // ID of the message corresponds to ID of arduino in network
     else // Given ID in message has no arduino
     {
-
       Serial.print("C Error! ID sent on message doesn't correespond to arduino ID in the network\n");
     }
   }
@@ -204,13 +207,6 @@ void setup()
 
   sys.calibration();
 
-  Serial.println("Calibration ended");
-  Serial.print("Info regarding Node ");
-  Serial.println("Gains:");
-  Serial.println(sys.k[0]);
-  Serial.println(sys.k[1]);
-  Serial.println(sys.k[2]);
-
   controller.initUff();
 }
 
@@ -222,7 +218,9 @@ void loop()
   if (millis() - ts >= 3500) // Debug
   {
     ts = millis();
-    Serial.print("C0 IA!\n");
+    Serial.print("C IA!\n");
+    Serial.print("D Visibility error ");
+    Serial.println(sys.visibility_error);
   }
 
   if (comObj.interruptCanMsg)
@@ -238,22 +236,19 @@ void loop()
 
   if (sys.samp)
   {
-    // When in free state change the reference to lowRef
-    if (desk_free.flag)
-    {
-      sys.x_des = desk_free.lowRef;
-      sys.newRef = true;
-      desk_free.flag = false;
-    }
-    // When in occupied state change the reference to upperRef
-    if (desk_occ.flag)
-    {
-      sys.x_des = desk_occ.upperRef;
-      sys.newRef = true;
-      desk_occ.flag = false;
-    }
+    // Total energy consumption
+    sys.total_energy += (sys.PJ * controller.u * 0.01);
+    // Total visibility error
+    sys.visibility_error += ((0) >= ((controller.e)) ? (0) : (controller.e)) / (millis() / 10);
 
-    controller.decentralizedCoordControl();
+    // Total flicker error
+
+    float aux1 = ((sys.Lux - sys.Lux_prev1)) < (0) ? -(sys.Lux - sys.Lux_prev1) : (sys.Lux - sys.Lux_prev1);                       // Abs value of (Lux - Prev_lux1)
+    float aux2 = ((sys.Lux_prev1 - sys.Lux_prev2)) < (0) ? -((sys.Lux_prev1 - sys.Lux_prev2)) : ((sys.Lux_prev1 - sys.Lux_prev2)); // Abs value of (Prev_lux1 - Prev_lux2)
+    float fi = (((sys.Lux - sys.Lux_prev1) * (sys.Lux_prev1 - sys.Lux_prev2)) >= ((0)) ? (0) : ((aux1 + aux2) / (2 * 0.01)));
+    sys.total_flicker_error += fi / (millis() / 10);
+
+    //controller.decentralizedCoordControl();
     sys.samp = false;
   }
 }

@@ -104,7 +104,7 @@ void Control::Decoupled_Fb_Ff_Control(float _simLux)
 void Control::decentralizedCoordControl()
 {
   CONTROL = true;
-  Serial.println("Start of control routine");
+  Serial.println("D Start of control routine");
   // Control the system with the Decentralized Coordinated Algorithm with sequential updates
   can_frame frame;
   int count = 0;
@@ -116,7 +116,7 @@ void Control::decentralizedCoordControl()
     // Iterate
     for (int i = 0; i < maxiterCoord; i++)
     {
-      Serial.print("Iter: ");
+      Serial.print("D Iter: ");
       Serial.println(i);
 
       // Identify the node that is computing the feedforward control intent
@@ -223,7 +223,14 @@ void Control::decentralizedCoordControl()
       exit(0);
     }
     // Saving the new feedforward component that accounts the accessible disturbances
-    uff = uff_PWM[j];
+    if (nodeList.n_nodes == 1)
+    {
+      uff = (sys.x_des - sys.o_node) / sys.k[0];
+    }
+    else
+    {
+      uff = uff_PWM[j];
+    }
   }
 
   // Feedback attenuates disturbances and noise
@@ -255,7 +262,7 @@ void Control::decentralizedCoordControl()
   {
     ui_before = ui;
   }
-  dataDisplay();
+  //dataDisplay();
 }
 
 float Control::l2_norm(float *u, int n)

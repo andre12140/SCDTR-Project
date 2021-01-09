@@ -74,6 +74,14 @@ public:
   float x_des = 0; // Desired State (Lux)
   float aux_m = 0;
 
+  //Metrics
+  float PJ = 1;               //maximum power
+  float total_energy = 0;     // Total energy consumption since last restart
+  float visibility_error = 0; // Totaal visibility error
+  float Lux_prev1 = 0;        // LUX measurement of t-1
+  float Lux_prev2 = 0;        // LUX measurement of t-2
+  float total_flicker_error = 0;
+
   // Flags and Counters
   bool INIT = true;
   bool newRef = false;
