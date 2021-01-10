@@ -1,10 +1,11 @@
-
+#
 #include <iostream>
 #include <string>
 #include <sstream>
 #include <boost/asio.hpp>
 #include <thread>
 #include "message.h"
+#include <ctime>
 
 using namespace boost::asio;
 using namespace boost::system;
@@ -17,6 +18,10 @@ using ec = const boost::system::error_code &;
 io_context io;
 serial_port sp{io};
 streambuf read_buf; //read buffer
+
+// DEBUG -------------
+std::clock_t start;
+double duration;
 
 size_t nBufferSize;
 char buf_cpy[MSG_SIZE];
@@ -51,7 +56,7 @@ public:
 
     bool check_valid_cmd(char *cmd_cv, char *msg, uint8_t cl_id)
     {
-        if (cmd_cv[1] != ' ' && cmd_cv[0] != 'r')
+        if (cmd_cv[1] != ' ')
         {
             return false;
         }
@@ -287,7 +292,6 @@ public:
 
         else if (cmd_cv[0] == 'r') // Restart system
         {
-
             msg[0] = (r | 0x80) & 0xBF;
         }
 
@@ -356,7 +360,7 @@ public:
                                      //std::cout << buf[0] << std::endl; // debug
                                      if (buf[0] == '\n')
                                      { //  End of command '\n'
-                                         std::cout << "[FROM CLIENT " << client_id << "] " << command;
+                                         std::cout << "From client " << client_id << ": " << command;
                                          //std::cout << "AR Depois de ler o comando, in avail:" << read_buf.in_avail() << std::endl;
                                          //check_valid_command();
 
@@ -364,7 +368,7 @@ public:
                                          char msg[8] = {0};
 
                                          check_valid_cmd(command_cpy, msg, (uint8_t)client_id);
-
+                                         start = std::clock();                        // get current time
                                          async_write(sp, buffer(msg), write_handler); //Writes to Arduino HUB (Serial Port)
                                          memset(command, 0, MSG_SIZE);                // CLear buffer
                                          cmd_cntr = 0;                                // Sets counter to zero after command read
@@ -392,6 +396,9 @@ class server
     ip::tcp::acceptor acc;
     void read_until_handler(ec err, size_t sz)
     {
+        duration = (std::clock() - start) / (double)CLOCKS_PER_SEC;
+
+        std::cout << "Operation took " << duration << "seconds" << std::endl;
         if (read_buf.in_avail() > 0) // If there's bytes to send in buffer
         {
             //std::cout << "RU Depois de ler do arduino, in avail:" << read_buf.in_avail() << std::endl;
@@ -403,8 +410,7 @@ class server
                 int cl_id = atoi(&buf_cpy[1]);
 
                 clients[cl_id].sess_obj->sock.wait(boost::asio::ip::tcp::socket::wait_write);
-
-                async_write(clients[cl_id].sess_obj->sock, buffer(&(buf_cpy[2]), sz - 2), [this](ec err, std::size_t sz) { //Writes to Client (TCP socket)
+                async_write(clients[cl_id].sess_obj->sock, buffer(buf_cpy), [this](ec err, std::size_t sz) { //Writes to Client (TCP socket)
                     //std::cout << "RU Depois de escrever p cliente" << read_buf.in_avail() << std::endl; //read_buf.consume(read_buf.size());                   // Clears buffer
                     //std::cout << "RU Return successfully sent to Client" << std::endl;
 
@@ -418,7 +424,7 @@ class server
             }
             else if (buf_cpy[0] == 'D') // Debug
             {
-                std::cout << "[MSG FROM ARDUINO] " << buf_cpy;
+                std::cout << "[DEBUG FROM ARDUINO] " << buf_cpy;
             }
         }
         async_read_until(sp, read_buf, '\n', [this](ec err, size_t sz) {
@@ -428,6 +434,7 @@ class server
 
     void serve_arduino_read()
     {
+        std::cout << "New session..." << std::endl;
         async_read_until(sp, read_buf, '\n', [this](ec err, size_t sz) {
             read_until_handler(err, sz);
         }); // Reads from Arduino HUB (Serial Port)
@@ -457,23 +464,15 @@ class server
                                  int cl_id = find_free_slot();
                                  if (cl_id == -1)
                                  {
-                                     std::cout << "Can't accept more clients" << std::endl; // Server already serving 8 clients
-                                     delete sess;                                           // Can't accept more connections
+                                     std::cout << "D Can't accept more clients" << std::endl; // Server already serving 8 clients
+                                     delete sess;                                             // Can't accept more connections
                                  }
                                  else // Accepts client
                                  {
-
+                                     std::cout << "D New client!" << std::endl;
                                      clients[cl_id] = {sess, cl_id};
                                      sess->client_id = cl_id;
-                                     int cli_cnt = 0; //Client counter
-                                     for (int i = 0; i < MAX_CLIENTS; i++)
-                                     {
-                                         if (clients[i].sess_obj != NULL)
-                                         {
-                                             cli_cnt++;
-                                         }
-                                     }
-                                     std::cout << "New client! Number of connected clients is " << cli_cnt << std::endl;
+
                                      sess->serve_client_request();
                                  }
                              }

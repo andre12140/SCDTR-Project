@@ -42,7 +42,7 @@ public:
                                  std::getline(is, line);
                                  if (!line.empty())
                                  {
-                                     std::cout << line << "\n";
+                                     std::cout << "[RECEIVED FROM SERVER]" << line << "\n";
                                  }
                                  start_read_server();
                              }
